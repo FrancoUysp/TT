@@ -4,7 +4,7 @@ from dash import dcc, html
 import plotly.graph_objs as go
 from dash.dependencies import Output, Input
 import asyncio
-from api import BinanceDataRetriever
+from apiv2 import *
 from preprocess import *
 import threading
 
@@ -19,7 +19,7 @@ class DashApp:
 
         self.previous_predictions = None
         # Create an instance of BinanceDataRetriever
-        self.retriever = BinanceDataRetriever()
+        self.api = PolygonClient()
 
         # Set the app layout
         self._set_layout()
@@ -53,7 +53,7 @@ class DashApp:
         )
         def update_graph(n_intervals):
             # Get the data from the retriever
-            preprocessed_data, dates, predictions = self.retriever.get_aggregate_data()
+            preprocessed_data, dates, predictions = self.api.get_aggregate_data()
             
             # Check if new predictions are the same as the previous ones
             if np.array_equal(self.previous_predictions, predictions):

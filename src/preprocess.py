@@ -3,77 +3,89 @@ import pandas as pd
 import ta
 from tqdm import tqdm
 import warnings
+import plotly.graph_objects as go
+
+from utils import read_df
 
 warnings.simplefilter("ignore")
 
-DATA_PATH = '../data/BTC_USDT.csv'
+DATA_PATH = '../data/L.csv'
 
 class DataPreprocessor:
-    def __init__(self, path = DATA_PATH, n = None):
+    def __init__(self, path = DATA_PATH):
         self.path = path
-        self.data = self._load_data(n)
+    def plot_candlestick_with_signals(self, output_file=None):
+        fig = go.Figure()
 
-    def _load_data(self, n):
-        column_names = ['Date', 'open', 'high', 'low', 'close', 'volume']
-        data = pd.read_csv(self.path, delimiter=',', names=column_names, header=0) # Using header=0 to utilize the first row as headers
-        if n is not None:
-            data = data.iloc[:n] 
-        data[['open', 'high', 'low', 'close', 'volume']] = data[['open', 'high', 'low', 'close', 'volume']].astype(float)
-        data['Date'] = pd.to_datetime(data['Date'], format='%Y-%m-%d %H:%M:%S')
-        return data
+        # Create the candlestick trace
+        fig.add_trace(go.Candlestick(x=self.data.index,
+                open=self.data['open'],
+                high=self.data['high'],
+                low=self.data['low'],
+                close=self.data['close'],
+                name='Candlesticks'))
 
-    def label_sharp_changes(self, window_size=30, price_diff_threshold=20):
+        # Create traces for buy and sell signals
+        buy_signals = self.data[self.data['target'] == 1]
+        sell_signals = self.data[self.data['target'] == -1]
+
+        fig.add_trace(go.Scatter(x=buy_signals.index, y=buy_signals['close'],
+                                 mode='markers', name='Buy Signals',
+                                 marker=dict(color='green', size=10, symbol='triangle-up')))
+
+        fig.add_trace(go.Scatter(x=sell_signals.index, y=sell_signals['close'],
+                                 mode='markers', name='Sell Signals',
+                                 marker=dict(color='red', size=10, symbol='triangle-down')))
+
+        # Update layout
+        fig.update_layout(
+            title='Candlestick Chart with Buy/Sell Signals',
+            xaxis_title='Date',
+            yaxis_title='Price',
+            template='plotly_dark',
+            xaxis_rangeslider_visible=False
+        )
+
+        if output_file:
+            fig.write_html(output_file)  # Save to file
+        else:
+            fig.show()  # Show the plot
+
+    def label_sharp_changes(self, look_ahead_window=20, price_increase_threshold=(1+0.00075), price_decrease_threshold=(1-0.0005)):
         """
-        Label sharp changes in closing price within a specified window size.
+        Label optimal buy/sell signals based on significant price changes in a look-ahead window.
 
         Parameters:
-        - data (pd.DataFrame): DataFrame with a 'Close' column containing closing prices.
-        - window_size (int): Size of the rolling window.
-        - price_diff_threshold (float): Threshold for detecting a sharp price change.
+        - look_ahead_window (int): The number of periods to look ahead to find significant price changes.
+        - price_increase_threshold (float): The threshold for a significant price increase.
+        - price_decrease_threshold (float): The threshold for a significant price decrease.
 
         Returns:
         - data (pd.DataFrame): Original DataFrame with an additional 'target' column.
         """
-        # Calculate rolling minimum and maximum
-        rolling_min = self.data['close'].rolling(window_size).min()
-        rolling_max = self.data['close'].rolling(window_size).max()
-
-        # Calculate price difference within the window
-        price_diff = rolling_max - rolling_min
-
-        # Identify indices with sharp price changes
-        sharp_changes_idx = np.where(price_diff >= price_diff_threshold)[0]
-
-        # Refine sharp change indices to avoid out-of-bounds error
-        sharp_changes_idx = sharp_changes_idx[sharp_changes_idx < len(self.data) - window_size + 1]
-
-        # Initialize a new column 'target' with zeros
-        self.data['target'] = 0
+        self.data['target'] = 0  # Initialize a new column 'target' with zeros
         
-         # Loop through each sharp change index
-        for idx in sharp_changes_idx:
-             # Find where the sharp change started (min or max within the window)
-            min_price = rolling_min.iloc[idx]
-            max_price = rolling_max.iloc[idx]
-            actual_price = self.data['close'].iloc[idx]
-            
-             # Check whether the change is an increase or decrease
-            if np.abs(actual_price - min_price) > np.abs(max_price - actual_price):
-                change_start_idx = self.data['close'].iloc[idx-window_size+1:idx+1].idxmin()
-                # Label the points where the sharp change occurred with 1
-                self.data['target'].iloc[change_start_idx:idx+1] = 1
-            else:
-                change_start_idx = self.data['close'].iloc[idx-window_size+1:idx+1].idxmax()
-                # Label the points where the sharp change occurred with -1
-                self.data['target'].iloc[change_start_idx:idx+1] = -1
+        # Rolling maximum and minimum prices in the look-ahead window
+        roll_max = self.data['close'].shift(-look_ahead_window).rolling(look_ahead_window, min_periods=1).mean()
+        roll_min = self.data['close'].shift(-look_ahead_window).rolling(look_ahead_window, min_periods=1).mean()
+        
+        # Identify buy and sell signals based on significant price changes
+        buy_signals = (roll_max >= self.data['close'] * price_increase_threshold)
+        sell_signals = (roll_min <= self.data['close'] * price_decrease_threshold)
+        
+        # Label the signals in the 'target' column
+        self.data.loc[buy_signals, 'target'] = 1
+        self.data.loc[sell_signals, 'target'] = -1
+
+        return self.data
 
     def add_time_features(self):
-        self.data['Year'] = self.data['Date'].dt.year
-        self.data['Month'] = self.data['Date'].dt.month
-        self.data['Day'] = self.data['Date'].dt.day
-        self.data['Hour'] = self.data['Date'].dt.hour
-        self.data['Minute'] = self.data['Date'].dt.minute
-        self.data['Day_of_Week'] = self.data['Date'].dt.dayofweek
+        self.data['Year'] = self.data['datetime'].dt.year
+        self.data['Month'] = self.data['datetime'].dt.month
+        self.data['Day'] = self.data['datetime'].dt.day
+        self.data['Hour'] = self.data['datetime'].dt.hour
+        self.data['Minute'] = self.data['datetime'].dt.minute
+        self.data['Day_of_Week'] = self.data['datetime'].dt.dayofweek
         self.data['Day_Sin'] = np.sin((self.data['Day'] - 1) * (2. * np.pi / 30))
         self.data['Day_Cos'] = np.cos((self.data['Day'] - 1) * (2. * np.pi / 30))
         self.data['Hour_Sin'] = np.sin(self.data['Hour'] * (2. * np.pi / 24))
@@ -134,51 +146,21 @@ class DataPreprocessor:
         self.data['Donchian_Channel_lband'] = donchian.donchian_channel_lband()
         self.data['Donchian_Channel_mband'] = donchian.donchian_channel_mband()
 
-
-
-        # On-Balance Volume (OBV)
-        self.data['OBV'] = ta.volume.OnBalanceVolumeIndicator(self.data['close'], self.data['volume']).on_balance_volume()
-
-        # Accumulation/Distribution Index
-        self.data['Accum/Dist'] = ta.volume.AccDistIndexIndicator(self.data['high'], self.data['low'], self.data['close'], self.data['volume']).acc_dist_index()
-
-        # Chaikin Money Flow (CMF)
-        self.data['CMF'] = ta.volume.ChaikinMoneyFlowIndicator(self.data['high'], self.data['low'], self.data['close'], self.data['volume']).chaikin_money_flow()
-
-        # Force Index
-        self.data['Force_Index'] = ta.volume.ForceIndexIndicator(self.data['close'], self.data['volume']).force_index()
-
-        # Ease of Movement (EoM)
-        self.data['EoM'] = ta.volume.EaseOfMovementIndicator(self.data['high'], self.data['low'], self.data['close'], self.data['volume']).ease_of_movement()
-        self.data['EoM_SMA'] = self.data['EoM'].rolling(window=14).mean()  # You can add a Simple Moving Average to the EoM
-
-        # Volume Price Trend
-        self.data['VPT'] = ta.volume.VolumePriceTrendIndicator(self.data['close'], self.data['volume']).volume_price_trend()
-
-        # Negative Volume Index (NVI)
-        self.data['NVI'] = ta.volume.NegativeVolumeIndexIndicator(self.data['close'], self.data['volume']).negative_volume_index()
-
-        # KST Oscillator
-        kst = ta.trend.KSTIndicator(self.data['close'])
-        self.data['KST'] = kst.kst()
-        self.data['KST_Signal'] = kst.kst_sig()
-
-        # TRIX - a momentum oscillator showing the percent rate of change of a triple exponentially smoothed moving average
-        self.data['TRIX'] = ta.trend.TRIXIndicator(self.data['close']).trix()
-
-
-        self.data.drop(columns=['Date'], inplace=True)
+        self.data.drop(columns=['datetime'], inplace=True)
 
     def handle_missing_values(self):
         self.data = self.data.dropna()
 
-    def save_to_csv(self, filename):
-        self.data.to_csv(filename, index=False)
-
-    def transform(self, data):
-        data[['open', 'high', 'low', 'close', 'volume']] = data[['open', 'high', 'low', 'close', 'volume']].astype(float)
-        data['Date'] = pd.to_datetime(data['Date'], format='%Y-%m-%d %H:%M:%S')
+    def transform_for_pred(self, data):
         self.data = data
+        self.add_time_features()
+        self.add_technical_indicators()
+        self.handle_missing_values()
+        return self.data
+
+    def transform_for_training(self, n = None):
+        self.data = read_df(DATA_PATH, n) 
+        self.label_sharp_changes()
         self.add_time_features()
         self.add_technical_indicators()
         self.handle_missing_values()
@@ -186,9 +168,6 @@ class DataPreprocessor:
 
 if __name__ == "__main__":
     preprocessor = DataPreprocessor()
-    preprocessor.label_sharp_changes()
-    preprocessor.add_time_features()
-    preprocessor.add_technical_indicators()
-    preprocessor.handle_missing_values()
+    preprocessor.transform_for_training(n=10000)
+    preprocessor.plot_candlestick_with_signals()
     print(preprocessor.data.head())
-    # preprocessor.save_to_csv("preprocessed_data.csv")
