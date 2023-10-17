@@ -153,9 +153,13 @@ class DataPreprocessor:
 
     def transform_for_pred(self, data):
         self.data = data
+        print("hello")
         self.add_time_features()
+        print("hello")
         self.add_technical_indicators()
+        print("hello")
         self.handle_missing_values()
+        print("hello")
         return self.data
 
     def transform_for_training(self, n = None):

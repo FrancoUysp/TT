@@ -8,18 +8,19 @@ from apiv2 import *
 from preprocess import *
 import threading
 
-from model import NeuralNetworkModel
+from model import LightGBMModel 
 
 
 class DashApp:
 
     def __init__(self):
         # Initialize the app
+        self.threads = 0
         self.app = dash.Dash(__name__)
 
         self.previous_predictions = None
         # Create an instance of BinanceDataRetriever
-        self.api = PolygonClient()
+        self.api = PolygonClient()  # Assuming APIKEY is defined
 
         # Set the app layout
         self._set_layout()
@@ -53,8 +54,7 @@ class DashApp:
         )
         def update_graph(n_intervals):
             # Get the data from the retriever
-            preprocessed_data, dates, predictions = self.api.get_aggregate_data()
-            
+            preprocessed_data, dates, predictions = self.api.get_agg_dat()  # Changed to get_agg_dat
             # Check if new predictions are the same as the previous ones
             if np.array_equal(self.previous_predictions, predictions):
                 raise dash.exceptions.PreventUpdate
@@ -121,18 +121,18 @@ class DashApp:
             return figure
 
     def run_websocket(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.retriever.subscribe('BTCUSDT', '1m'))
-        loop.run_forever()
+        self.api.connect()
 
     def run(self):
-        # Create a thread to run the WebSocket
-        ws_thread = threading.Thread(target=self.run_websocket)
-        ws_thread.start()
+        if self.threads == 0:
+            self.threads = 1
+            ws_thread = threading.Thread(target=self.run_websocket)
+            ws_thread.start()
+            print("WebSocket thread started")
 
-        # Run the Dash server
-        self.app.run_server(debug=False)
+        if self.threads == 1:
+            print("Starting the Dash app")
+            self.app.run_server(debug=False)
 
 
 if __name__ == '__main__':

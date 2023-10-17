@@ -19,8 +19,6 @@ class LightGBMModel:
     def predict(self, df, thresh=0.6):
         X = df.apply(pd.to_numeric, errors="coerce").dropna()
         y_pred_proba = self.model.predict(X, num_iteration=self.model.best_iteration)  # Get predicted probabilities
-        
-        # Convert probabilities to class labels based on the threshold
         y_pred = np.where(
             y_pred_proba > thresh, 1,  # probability of class 1 > 0.6 => label 1
             np.where(
@@ -95,7 +93,7 @@ class LightGBMModel:
     def backtest(self):
         if self.model is None:
             raise ValueError("Model is not trained yet.")
-        self.y_pred = self.predict(self.X_test, 0.75)  # Use your predict method
+        self.y_pred = self.predict(self.X_test, 0.6)  # Use your predict method
         report = classification_report(np.array(self.y_test), self.y_pred)  # Compare with y_test
         print(report)
 
@@ -173,7 +171,7 @@ class LightGBMModel:
 
 if __name__ == "__main__":
     preprocessor = DataPreprocessor()
-    preprocessor.transform_for_training(n=450000)
+    preprocessor.transform_for_training()
     data = preprocessor.data
 
 

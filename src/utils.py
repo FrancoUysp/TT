@@ -17,18 +17,14 @@ def read_df(file_loc, n=None):
             nrows=n
         )
 
-    data['date'] = pd.to_datetime(data['date'], format='%Y.%m.%d').dt.strftime('%Y-%m-%d')
 
-    for col in ["open", "high", "low", "close"]:  # Lowercase column names
-        data[col] = data[col].str.replace(",", ".").astype(float)
+    for col in ["open", "high", "low", "close"]:
+        data[col] = pd.to_numeric(data[col].str.replace(",", "."), errors='coerce')
 
     # Create 'datetime' column by combining 'date' and 'time' columns
-    data["datetime"] = data.apply(
-        lambda row: datetime.datetime.strptime(  # Adjusted reference to strptime method
-            f"{row['date']} {row['time']}", "%Y-%m-%d %H:%M:%S"
-        ),
-        axis=1,
-    )
+    data['datetime'] = pd.to_datetime(data['date'] + ' ' + data['time'], format='%Y.%m.%d %H:%M:%S', errors='coerce')
+    data.dropna(inplace=True, axis=0)
+
 
     # Drop 'date' and 'time' columns
     data = data.drop(columns=['date', 'time'])
