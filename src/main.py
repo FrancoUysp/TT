@@ -62,8 +62,6 @@ class DashApp:
                 return go.Figure()  
 
             self.previous_predictions = predictions
-            preprocessed_data["DisplayDate"] = preprocessed_data.index.astype(str)
-            preprocessed_data.reset_index(drop=True, inplace=True)
 
             # Create a new figure
             figure = go.Figure()
@@ -71,42 +69,42 @@ class DashApp:
             # Candlestick trace
             figure.add_trace(
                 go.Candlestick(
-                    x=preprocessed_data.index,  # Using continuous range index
+                    x=dates,
                     open=preprocessed_data['open'],
                     high=preprocessed_data['high'],
                     low=preprocessed_data['low'],
                     close=preprocessed_data['close'],
-                    name="Candlesticks",
-                    hovertext=preprocessed_data["DisplayDate"] 
+                    name="Candlesticks"
                 )
             )
 
+            # Predicted Buy/Sell signal trace
             predicted_buy_indices = np.where(predictions == 1)[0]
             predicted_sell_indices = np.where(predictions == 0)[0]
 
-            # Since we reset the index, we can directly use these indices
+            predicted_buy_dates = dates.iloc[predicted_buy_indices]
+            predicted_sell_dates = dates.iloc[predicted_sell_indices]
+
             predicted_buy_close_values = preprocessed_data['close'].iloc[predicted_buy_indices]
             predicted_sell_close_values = preprocessed_data['close'].iloc[predicted_sell_indices]
 
             figure.add_trace(
                 go.Scatter(
-                    x=predicted_buy_indices,  # Using adjusted indices
+                    x=predicted_buy_dates,
                     y=predicted_buy_close_values,
                     mode="markers",
                     name="Predicted Buy Signals",
                     marker=dict(color="lime", size=12, symbol="circle"),
-                    hovertext=preprocessed_data["DisplayDate"].iloc[predicted_buy_indices]  # Display original dates on hover
                 )
             )
 
             figure.add_trace(
                 go.Scatter(
-                    x=predicted_sell_indices,  # Using adjusted indices
+                    x=predicted_sell_dates,
                     y=predicted_sell_close_values,
                     mode="markers",
                     name="Predicted Sell Signals",
                     marker=dict(color="magenta", size=12, symbol="circle"),
-                    hovertext=preprocessed_data["DisplayDate"].iloc[predicted_sell_indices]  # Display original dates on hover
                 )
             )
 
