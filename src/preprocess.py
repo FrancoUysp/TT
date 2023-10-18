@@ -130,7 +130,7 @@ class DataPreprocessor:
         self.data.drop(columns=['datetime'], inplace=True)
 
     def handle_missing_values(self):
-        self.data = self.data.dropna()
+        self.data.dropna(axis=0, inplace=True)
 
     def transform_for_pred(self, data):
         self.data = data

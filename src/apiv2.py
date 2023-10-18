@@ -52,17 +52,17 @@ class PolygonClient:
                     writer.writerow(new_row)  
 
                 self.live_df = read_df(LIVE_DATA_PATH)
-                self.dates = self.live_df["datetime"]
                 if (self.live_df.shape[0]>60):
-                    self.processed_df = self.processor.transform_for_pred(self.live_df)
+                    self.processed_df = self.processor.transform_for_pred(self.live_df.copy())
                     if self.processed_df.empty:
                         self.dates = None
                         self.predictions = None
                     else:
-                        self.predictions = self.model.predict(self.processed_df, 0.65)
-                        self.dates = self.dates[self.processed_df.shape[0]:]
+                        self.predictions = self.model.pred_t(df=self.processed_df, thresh=0.6)
+                        self.dates = self.live_df.iloc[-self.processed_df.shape[0]:]["datetime"]
 
                 print(self.live_df)
+                print(self.processed_df)
 
     def on_error(self, ws, error):
         print(f"Error: {error}")

@@ -17,7 +17,7 @@ class LightGBMModel:
         self.split_perc = split_perc
         self.processor = DataPreprocessor()
 
-    def predict(self, df, thresh=0.6):
+    def pred_t(self, df, thresh=0.6):
         X = df.apply(pd.to_numeric, errors="coerce").dropna()
         y_pred_proba = self.model.predict(X, num_iteration=self.model.best_iteration)  # Get predicted probabilities
         y_pred = np.where(
@@ -27,6 +27,7 @@ class LightGBMModel:
                 0  
             )
         )
+        print(y_pred)
         return y_pred
 
     def set_data(self, data):
@@ -110,7 +111,7 @@ class LightGBMModel:
     def backtest(self):
         if self.model is None:
             raise ValueError("Model is not trained yet.")
-        self.y_pred = self.predict(self.X_test, 0.8)  # Use your predict method
+        self.y_pred = self.pred_t(self.X_test, 0.8)  # Use your predict method
         report = classification_report(np.array(self.y_test), self.y_pred)  # Compare with y_test
         print(report)
 

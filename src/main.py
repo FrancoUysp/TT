@@ -62,6 +62,7 @@ class DashApp:
                 return go.Figure()  
 
             self.previous_predictions = predictions
+            str_dates = dates.astype(str).tolist()
 
             # Create a new figure
             figure = go.Figure()
@@ -69,7 +70,7 @@ class DashApp:
             # Candlestick trace
             figure.add_trace(
                 go.Candlestick(
-                    x=dates,
+                    x=str_dates,
                     open=preprocessed_data['open'],
                     high=preprocessed_data['high'],
                     low=preprocessed_data['low'],
@@ -80,10 +81,10 @@ class DashApp:
 
             # Predicted Buy/Sell signal trace
             predicted_buy_indices = np.where(predictions == 1)[0]
-            predicted_sell_indices = np.where(predictions == 0)[0]
+            predicted_sell_indices = np.where(predictions == -1)[0]
 
-            predicted_buy_dates = dates.iloc[predicted_buy_indices]
-            predicted_sell_dates = dates.iloc[predicted_sell_indices]
+            predicted_buy_dates = [str_dates[i] for i in predicted_buy_indices]
+            predicted_sell_dates = [str_dates[i] for i in predicted_sell_indices]
 
             predicted_buy_close_values = preprocessed_data['close'].iloc[predicted_buy_indices]
             predicted_sell_close_values = preprocessed_data['close'].iloc[predicted_sell_indices]
@@ -107,7 +108,6 @@ class DashApp:
                     marker=dict(color="magenta", size=12, symbol="circle"),
                 )
             )
-
             # Layout adjustments
             figure.update_layout(
                 title="Candlestick Chart with Predicted Buy/Sell Signals",
@@ -115,6 +115,7 @@ class DashApp:
                 yaxis_title="Price",
                 template="plotly_dark",
                 xaxis_rangeslider_visible=False,
+                xaxis=dict(type="category")  # Here's the change to force the xaxis to be categorical
             )
 
             return figure
@@ -131,7 +132,7 @@ class DashApp:
 
         if self.threads == 1:
             print("Starting the Dash app")
-            self.app.run_server(debug=False)
+            self.app.run_server(host = "0.0.0.0", debug=False)
 
 
 if __name__ == '__main__':
