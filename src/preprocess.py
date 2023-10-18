@@ -118,6 +118,15 @@ class DataPreprocessor:
         self.data['Donchian_Channel_lband'] = donchian.donchian_channel_lband()
         self.data['Donchian_Channel_mband'] = donchian.donchian_channel_mband()
 
+        self.data['DPO'] = ta.trend.DPOIndicator(self.data['close']).dpo()
+
+        # Keltner Channel (KC)
+        typical_price = (self.data['high'] + self.data['low'] + self.data['close']) / 3
+        self.data['MFI'] = ta.volume.MFIIndicator(high=self.data['high'], low=self.data['low'], close=self.data['close'], volume=typical_price).money_flow_index()
+
+        # Trix
+        self.data['Trix'] = ta.trend.TRIXIndicator(self.data['close']).trix()
+
         self.data.drop(columns=['datetime'], inplace=True)
 
     def handle_missing_values(self):
@@ -130,7 +139,7 @@ class DataPreprocessor:
         self.handle_missing_values()
         return self.data
 
-    def analyze_sharp_changes(self, data, window_size=50, price_diff_threshold=10, tolerance=1):
+    def analyze_sharp_changes(self, data, window_size=30, price_diff_threshold=50, tolerance=1):
         """
         Analyze the data for sharp changes, compute related products, and assign buy/sell/hold signals.
         
@@ -217,6 +226,6 @@ class DataPreprocessor:
 
 if __name__ == "__main__":
     preprocessor = DataPreprocessor()
-    preprocessor.transform_for_training(n=10000)
+    preprocessor.transform_for_training()
     preprocessor.plot_candlestick_with_signals()
     print(preprocessor.data.head())

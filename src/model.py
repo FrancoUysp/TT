@@ -110,7 +110,7 @@ class LightGBMModel:
     def backtest(self):
         if self.model is None:
             raise ValueError("Model is not trained yet.")
-        self.y_pred = self.predict(self.X_test, 0.6)  # Use your predict method
+        self.y_pred = self.predict(self.X_test, 0.65)  # Use your predict method
         report = classification_report(np.array(self.y_test), self.y_pred)  # Compare with y_test
         print(report)
 
