@@ -51,34 +51,6 @@ class DataPreprocessor:
         else:
             fig.show()  # Show the plot
 
-    def label_sharp_changes(self, look_ahead_window=20, price_increase_threshold=(1+0.00075), price_decrease_threshold=(1-0.0005)):
-        """
-        Label optimal buy/sell signals based on significant price changes in a look-ahead window.
-
-        Parameters:
-        - look_ahead_window (int): The number of periods to look ahead to find significant price changes.
-        - price_increase_threshold (float): The threshold for a significant price increase.
-        - price_decrease_threshold (float): The threshold for a significant price decrease.
-
-        Returns:
-        - data (pd.DataFrame): Original DataFrame with an additional 'target' column.
-        """
-        self.data['target'] = 0  # Initialize a new column 'target' with zeros
-        
-        # Rolling maximum and minimum prices in the look-ahead window
-        roll_max = self.data['close'].shift(-look_ahead_window).rolling(look_ahead_window, min_periods=1).mean()
-        roll_min = self.data['close'].shift(-look_ahead_window).rolling(look_ahead_window, min_periods=1).mean()
-        
-        # Identify buy and sell signals based on significant price changes
-        buy_signals = (roll_max >= self.data['close'] * price_increase_threshold)
-        sell_signals = (roll_min <= self.data['close'] * price_decrease_threshold)
-        
-        # Label the signals in the 'target' column
-        self.data.loc[buy_signals, 'target'] = 1
-        self.data.loc[sell_signals, 'target'] = -1
-
-        return self.data
-
     def add_time_features(self):
         self.data['Year'] = self.data['datetime'].dt.year
         self.data['Month'] = self.data['datetime'].dt.month
@@ -153,18 +125,91 @@ class DataPreprocessor:
 
     def transform_for_pred(self, data):
         self.data = data
-        print("hello")
         self.add_time_features()
-        print("hello")
         self.add_technical_indicators()
-        print("hello")
         self.handle_missing_values()
-        print("hello")
         return self.data
+
+    def analyze_sharp_changes(self, data, window_size=50, price_diff_threshold=10, tolerance=1):
+        """
+        Analyze the data for sharp changes, compute related products, and assign buy/sell/hold signals.
+        
+        Parameters:
+        - data (pd.DataFrame): DataFrame with a 'Close' column containing closing prices.
+        - window_size (int): Size of the rolling window.
+        - price_diff_threshold (float): Threshold for detecting a sharp price change.
+        - tolerance (float): Threshold for proximity to sharp changes for buy/sell/hold signals.
+
+        Returns:
+        - data (pd.DataFrame): DataFrame with the new columns.
+        """
+        
+        rolling_min = data['close'].rolling(window_size).min()
+        rolling_max = data['close'].rolling(window_size).max()
+        
+        price_diff = rolling_max - rolling_min
+        sharp_changes_idx = np.where(price_diff >= price_diff_threshold)[0]
+        sharp_changes_idx = sharp_changes_idx[sharp_changes_idx < len(data) - window_size + 1]
+        sharp_changes_info = []
+        for idx in sharp_changes_idx:
+            min_price = rolling_min.iloc[idx]
+            max_price = rolling_max.iloc[idx]
+            actual_price = data['close'].iloc[idx]
+            if np.abs(actual_price - min_price) > np.abs(max_price - actual_price):
+                change_start_price = min_price
+                change_magnitude = actual_price - min_price
+            else:
+                change_start_price = max_price
+                change_magnitude = max_price - actual_price
+            
+            if not any(np.abs(change_start_price - prev_price) < window_size for prev_price, _ in sharp_changes_info):
+                sharp_changes_info.append((change_start_price, change_magnitude))
+        
+        # Sort the changes by magnitude in descending order, extract the prices, and then sort by price
+        lines = sorted([price for price, _ in sorted(sharp_changes_info, key=lambda x: x[1], reverse=True)])
+        data = data[data['close'] >= (10000 - 20)]
+
+        close_prices = data['close'].values[:, np.newaxis]
+        lines = np.array(lines)
+        lines_reshaped = lines[np.newaxis, :]
+
+        diffs = lines_reshaped - close_prices
+        partitioned_indices = np.argpartition(np.abs(diffs), 4, axis=1)[:, :4]
+        closest_diffs = np.take_along_axis(diffs, partitioned_indices, axis=1)
+        closest_rs_values = np.take_along_axis(lines_reshaped, partitioned_indices, axis=1)
+        # product_values = closest_diffs * closest_rs_values
+
+        # data['SL_1'] = product_values[:, 0]
+        # data['SL_2'] = product_values[:, 1]
+        # data['SL_3'] = product_values[:, 2]
+        # data['SL_4'] = product_values[:, 3]
+
+        data['target'] = np.nan
+        tolerance = 1
+        close_prices = data['close'].values[:, np.newaxis]
+        diffs = np.abs(lines_reshaped - close_prices)
+        within_tolerance_indices = np.where(diffs <= tolerance)
+
+        data = data.reset_index(drop=True)
+
+        # Ensure valid indices before assignment
+        valid_indices = set(data.index)
+        filtered_indices = [idx for idx in within_tolerance_indices[0] if idx in valid_indices]
+
+        data.loc[filtered_indices, 'target'] = lines_reshaped[0, within_tolerance_indices[1]]
+
+        data.loc[within_tolerance_indices[0], 'target'] = lines_reshaped[0, within_tolerance_indices[1]]
+        data['target'].fillna(method='bfill', inplace=True)
+        data.dropna(subset=['target'], inplace=True)
+        diffs = data['target'] - data['close']
+        data['target'] = np.where(diffs > 0, 1, np.where(diffs < 0, -1, 0))
+        
+        return data 
+                    
 
     def transform_for_training(self, n = None):
         self.data = read_df(DATA_PATH, n) 
-        self.label_sharp_changes()
+        self.data = self.analyze_sharp_changes(self.data)
         self.add_time_features()
         self.add_technical_indicators()
         self.handle_missing_values()

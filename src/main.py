@@ -53,9 +53,8 @@ class DashApp:
             Input('interval-component', 'n_intervals')
         )
         def update_graph(n_intervals):
-            # Get the data from the retriever
+#######################################################################################################
             preprocessed_data, dates, predictions = self.api.get_agg_dat()  # Changed to get_agg_dat
-            # Check if new predictions are the same as the previous ones
             if np.array_equal(self.previous_predictions, predictions):
                 raise dash.exceptions.PreventUpdate
 
@@ -119,7 +118,7 @@ class DashApp:
             )
 
             return figure
-
+####################################################################################################
     def run_websocket(self):
         self.api.connect()
 

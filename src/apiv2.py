@@ -59,7 +59,7 @@ class PolygonClient:
                         self.dates = None
                         self.predictions = None
                     else:
-                        self.predictions = self.model.predict(self.processed_df, 0.5)
+                        self.predictions = self.model.predict(self.processed_df, 0.65)
                         self.dates = self.dates[self.processed_df.shape[0]:]
 
                 print(self.live_df)

@@ -15,6 +15,7 @@ class LightGBMModel:
     def __init__(self, split_perc=0.95):
         self.model = None
         self.split_perc = split_perc
+        self.processor = DataPreprocessor()
 
     def predict(self, df, thresh=0.6):
         X = df.apply(pd.to_numeric, errors="coerce").dropna()
@@ -31,6 +32,33 @@ class LightGBMModel:
     def set_data(self, data):
         self.data = data
         self.data = data.apply(pd.to_numeric, errors="coerce").dropna()
+
+    def plot_feature_importances(self):
+        if self.model is None:
+            raise ValueError("Model is not trained yet.")
+            
+        # Extract feature names and their importance scores
+        features = self.X_train.columns.tolist()
+        importances = self.model.feature_importance(importance_type="gain")
+        
+        # Sorting the features based on importance
+        sorted_idx = np.argsort(importances)[::-1]
+        
+        # Creating the bar chart
+        fig = go.Figure([go.Bar(
+            x=np.array(features)[sorted_idx],
+            y=importances[sorted_idx],
+            orientation='v'
+        )])
+        
+        fig.update_layout(
+            title="Feature Importance",
+            xaxis_title="Features",
+            yaxis_title="Importance",
+            template="plotly_dark",
+        )
+        
+        fig.show()
 
     def preprocess_data(self):
         self.split_idx = int(len(self.data) * self.split_perc)
@@ -50,17 +78,7 @@ class LightGBMModel:
         ros = RandomUnderSampler()
         self.X_train, self.y_train = ros.fit_resample(self.X_train, self.y_train)
 
-
     def train(self):
-
-        def pnl_metric(preds, train_data):
-            labels = train_data.get_label()
-            indices = train_data.get_data().index
-            buy_sell_signals = np.where(preds > 0.5, 1, -1)  # assuming binary classification
-            prices = self.data['close'].iloc[indices]
-            shifted_signals = np.roll(buy_sell_signals, -20)  # Shift signals to align with future price changes
-            pnl = np.sum(shifted_signals[1:] * prices.diff().iloc[1:])  # calculate PnL
-            return 'Profit and Loss', pnl, True  # higher PnL is better
 
         # Splitting some of your training data into a validation set
         X_train_split, X_val_split, y_train_split, y_val_split = train_test_split(
@@ -80,10 +98,9 @@ class LightGBMModel:
         self.model = lgb.train(
             params,
             d_train,
-            valid_sets=[d_valid],  # Validation data used for early stopping
-            callbacks=[lgb.early_stopping(stopping_rounds=50, verbose=True)],  # Stop after 50 rounds of no improvement
-            num_boost_round=2000,  # Maximum number of boosting rounds
-            feval=pnl_metric,
+            valid_sets=[d_valid],  
+            callbacks=[lgb.early_stopping(stopping_rounds=10, verbose=True)],  
+            num_boost_round=2000, 
         )
 
         # This will print the optimal number of boosting rounds (trees)
@@ -93,7 +110,7 @@ class LightGBMModel:
     def backtest(self):
         if self.model is None:
             raise ValueError("Model is not trained yet.")
-        self.y_pred = self.predict(self.X_test, 0.6)  # Use your predict method
+        self.y_pred = self.predict(self.X_test, 0.7)  # Use your predict method
         report = classification_report(np.array(self.y_test), self.y_pred)  # Compare with y_test
         print(report)
 
@@ -179,6 +196,7 @@ if __name__ == "__main__":
     model.set_data(data)
     model.preprocess_data()
     model.train()
+    model.plot_feature_importances()
     model.backtest()
     model.plot_candlestick_with_predictions()
     model.save_model("../models")
