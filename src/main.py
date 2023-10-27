@@ -7,6 +7,7 @@ import asyncio
 from apiv2 import *
 from preprocess import *
 import threading
+from utils import *
 
 from model import LightGBMModel 
 
@@ -19,13 +20,12 @@ class DashApp:
         self.app = dash.Dash(__name__)
 
         self.previous_predictions = None
-        # Create an instance of BinanceDataRetriever
+
+        update_main()
+        self.buffer_data = create_buffer_queue()
+        
         self.api = PolygonClient()  # Assuming APIKEY is defined
-
-        # Set the app layout
         self._set_layout()
-
-        # Define callback
         self._set_callback()
 
     def _set_layout(self):
