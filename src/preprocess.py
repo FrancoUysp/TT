@@ -195,7 +195,7 @@ class DataPreprocessor:
         # data = data[data['close'] >= (10000 - 20)]
 
         rs_lines_path = os.path.join('..', 'data', 'stronglines.csv')
-        rs_lines = pd.read_csv(rs_lines_path)
+        lines = pd.read_csv(rs_lines_path)
 
         close_prices = data['close'].values[:, np.newaxis]
         lines = np.array(lines)
