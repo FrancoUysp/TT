@@ -14,6 +14,7 @@ class DashApp:
     def __init__(self):
         self.processor = DataPreprocessor()
         self.model = LightGBMModel()
+        self.model.load_model(os.path.join("..", "models"))
         self.app = dash.Dash(__name__)
 
         self.previous_predictions = None
