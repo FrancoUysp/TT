@@ -3,7 +3,6 @@ import os
 import MetaTrader5 as mt5
 import numpy as np
 from datetime import datetime as dt, timedelta
-import schedule
 import time
 
 BUFFER_SIZE = 60

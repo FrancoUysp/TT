@@ -80,60 +80,30 @@ class LightGBMModel:
         ros = RandomOverSampler()
         self.X_train, self.y_train = ros.fit_resample(self.X_train, self.y_train)
 
-    def custom_loss(self, preds, train_data):
-        """
-        Custom loss that takes into account:
-        1. Distance from buy/sell signals.
-        2. If a buy is larger than the previous sell and vice-versa.
-        """
-        labels = train_data.get_label()
-        diff = preds - labels
-        grad = np.where(labels == 1, diff * 2, diff)  # Penalize distance from buy signals more
-
-        # Vectorized penalty based on sequential predictions
-        buy_condition = np.logical_and(preds[1:] > 0.5, preds[:-1] <= 0.5)
-        stronger_buy_condition = preds[1:][buy_condition] > preds[:-1][buy_condition]
-
-        sell_condition = np.logical_and(preds[1:] <= 0.5, preds[:-1] > 0.5)
-        stronger_sell_condition = preds[1:][sell_condition] < preds[:-1][sell_condition]
-
-        # Initialize penalties with zeros
-        penalties = np.zeros_like(preds)
-        penalties[1:][buy_condition] = stronger_buy_condition.astype(float)
-        penalties[1:][sell_condition] = stronger_sell_condition.astype(float)
-        
-        grad += penalties
-
-        hess = np.ones_like(grad)  # Using a simple hessian
-        return grad, hess
-
-    def custom_eval(self, preds, train_data):
-        """
-        Custom evaluation metric.
-        """
-        labels = train_data.get_label()
-        precision = np.sum((preds > 0.5) & (labels == 1)) / np.sum(preds > 0.5)
-        return 'CustomPrecision', precision, True  # True means higher precision is better
     def train(self):
         d_train = lgb.Dataset(self.X_train, label=self.y_train, free_raw_data=False)
 
         params = {
-            'objective': self.custom_loss,  # Pass custom objective function
-            'metric': 'custom',  # Use custom metric
+            'objective': "binary",
+            'metric': 'binary_error', 
+            'boosting_type': 'dart',   # This is the correction for the 'dart' entry
             'is_unbalance': True,
         }
 
         def tqdm_callback():
             pbar = tqdm(total=500, desc="Training Progress")  
+            
             def callback(env):
                 if env.iteration % 10 == 0:
                     pbar.update(10)
+                if env.iteration >= 500:  # or you can use pbar.total
+                    pbar.close()  # Ensure the progress bar is closed at the end
+
             return callback
 
         self.model = lgb.train(
             params,
             d_train,
-            feval=self.custom_eval,
             callbacks=[tqdm_callback()],
             num_boost_round=500,
         )
@@ -142,7 +112,7 @@ class LightGBMModel:
     def backtest(self):
         if self.model is None:
             raise ValueError("Model is not trained yet.")
-        self.y_pred = self.pred_t(self.X_test, 0.99)  # Use your predict method
+        self.y_pred = self.pred_t(self.X_test, 0.5)  # Use your predict method
         report = classification_report(np.array(self.y_test), self.y_pred)  # Compare with y_test
         print(report)
 
@@ -172,7 +142,6 @@ class LightGBMModel:
 
         fig = go.Figure()
 
-        # Candlestick trace
         fig.add_trace(
             go.Candlestick(
                 x=data.index,

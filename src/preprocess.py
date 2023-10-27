@@ -71,6 +71,7 @@ class DataPreprocessor:
         self.data['Hour_Cos'] = np.cos(self.data['Hour'] * (2. * np.pi / 24))
         self.data['Minute_Sin'] = np.sin(self.data['Minute'] * (2. * np.pi / 60))
         self.data['Minute_Cos'] = np.cos(self.data['Minute'] * (2. * np.pi / 60))
+        self.data.drop(columns=['datetime'], inplace=True)
 
     def add_summaries(self):
         for col in ['open', 'high', 'low', 'close']:
@@ -119,18 +120,14 @@ class DataPreprocessor:
         self.data['Pct_Change_10min'] = self.data['close'].pct_change(10)
         self.data['Pct_Change_30min'] = self.data['close'].pct_change(30)
 
-        # Volatility Indicators
         self.data['ATRP'] = ta.volatility.AverageTrueRange(self.data['high'], self.data['low'], self.data['close']).average_true_range()
 
-        # Other Indicators
         self.data['Historical_Volatility'] = self.data['close'].rolling(window=10).std() * (252**0.5)  # Annualized volatility
         self.data['Price_Oscillator'] = self.data['close'].diff(4)  # Difference between the current price and the price 4 periods ago
         self.data['Standard_Deviation'] = self.data['close'].rolling(window=14).std()
 
-        # Commodity Channel Index (CCI)
         self.data['CCI'] = ta.trend.CCIIndicator(self.data['high'], self.data['low'], self.data['close']).cci()
 
-        # Donchian Channels
         donchian = ta.volatility.DonchianChannel(self.data['high'], self.data['low'], self.data['close'])
         self.data['Donchian_Channel_hband'] = donchian.donchian_channel_hband()
         self.data['Donchian_Channel_lband'] = donchian.donchian_channel_lband()
@@ -138,14 +135,11 @@ class DataPreprocessor:
 
         self.data['DPO'] = ta.trend.DPOIndicator(self.data['close']).dpo()
 
-        # Keltner Channel (KC)
         typical_price = (self.data['high'] + self.data['low'] + self.data['close']) / 3
         self.data['MFI'] = ta.volume.MFIIndicator(high=self.data['high'], low=self.data['low'], close=self.data['close'], volume=typical_price).money_flow_index()
 
-        # Trix
         self.data['Trix'] = ta.trend.TRIXIndicator(self.data['close']).trix()
 
-        self.data.drop(columns=['datetime'], inplace=True)
 
     def handle_missing_values(self):
         self.data.dropna(axis=0, inplace=True)
@@ -237,49 +231,12 @@ class DataPreprocessor:
         data['target'] = np.where(diffs > tolerance, 1, np.where(diffs < tolerance, -1, 0))
         
         return data 
-
-    def apply_ica(self, n_components=None):
-        """
-        Apply ICA on the dataset after scaling while preserving the 'target' column.
-        
-        Parameters:
-        - n_components (int or None): number of components to keep. If None, all components will be kept.
-        
-        Returns:
-        - transformed_data (pd.DataFrame): data transformed using ICA with 'target' appended
-        """
-        
-        # First, save the 'target' column
-        target_col = self.data['target']
-        
-        # Drop 'target' from data to prepare for scaling and ICA
-        data_without_target = self.data.drop(columns=['target'])
-
-        # Scale the data
-        scaler = StandardScaler()
-        scaled_data = scaler.fit_transform(data_without_target)
-
-        # Apply ICA
-        ica = FastICA(n_components=n_components, random_state=0)
-        transformed_data = ica.fit_transform(scaled_data)
-        
-        # Convert transformed data back to a DataFrame for consistency
-        columns = [f"IC{i+1}" for i in range(transformed_data.shape[1])]
-        transformed_data = pd.DataFrame(transformed_data, columns=columns)
-        
-        # Append the 'target' column back to the transformed data
-        transformed_data['target'] = target_col
-
-        return transformed_data
-
     def transform_for_training(self, n = None):
-        self.data = read_df(DATA_PATH, n) 
         self.data = self.analyze_sharp_changes(self.data)
         self.add_time_features()
         self.add_summaries()
         self.add_technical_indicators()
         self.handle_missing_values()
-        # self.data = self.apply_ica(3)
         return self.data
 
 if __name__ == "__main__":
