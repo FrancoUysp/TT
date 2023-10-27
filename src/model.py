@@ -9,6 +9,7 @@ from sklearn.metrics import classification_report
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler 
 from preprocess import *
+from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 
 class LightGBMModel:
@@ -76,55 +77,89 @@ class LightGBMModel:
         self.y_test = self.data.iloc[self.split_idx:]["target"]  
         print("Unique value counts in testing data target variable:\n", self.y_test.value_counts())
 
-        ros = RandomUnderSampler()
+        ros = RandomOverSampler()
         self.X_train, self.y_train = ros.fit_resample(self.X_train, self.y_train)
 
+    def custom_loss(self, preds, train_data):
+        """
+        Custom loss that takes into account:
+        1. Distance from buy/sell signals.
+        2. If a buy is larger than the previous sell and vice-versa.
+        """
+        labels = train_data.get_label()
+        diff = preds - labels
+        grad = np.where(labels == 1, diff * 2, diff)  # Penalize distance from buy signals more
+
+        # Vectorized penalty based on sequential predictions
+        buy_condition = np.logical_and(preds[1:] > 0.5, preds[:-1] <= 0.5)
+        stronger_buy_condition = preds[1:][buy_condition] > preds[:-1][buy_condition]
+
+        sell_condition = np.logical_and(preds[1:] <= 0.5, preds[:-1] > 0.5)
+        stronger_sell_condition = preds[1:][sell_condition] < preds[:-1][sell_condition]
+
+        # Initialize penalties with zeros
+        penalties = np.zeros_like(preds)
+        penalties[1:][buy_condition] = stronger_buy_condition.astype(float)
+        penalties[1:][sell_condition] = stronger_sell_condition.astype(float)
+        
+        grad += penalties
+
+        hess = np.ones_like(grad)  # Using a simple hessian
+        return grad, hess
+
+    def custom_eval(self, preds, train_data):
+        """
+        Custom evaluation metric.
+        """
+        labels = train_data.get_label()
+        precision = np.sum((preds > 0.5) & (labels == 1)) / np.sum(preds > 0.5)
+        return 'CustomPrecision', precision, True  # True means higher precision is better
     def train(self):
-
-        # Splitting some of your training data into a validation set
-        X_train_split, X_val_split, y_train_split, y_val_split = train_test_split(
-            self.X_train, self.y_train, test_size=0.2, random_state=42, stratify=self.y_train
-        )
-
-        d_train = lgb.Dataset(X_train_split, label=y_train_split, free_raw_data=False)
-        d_valid = lgb.Dataset(X_val_split, label=y_val_split, free_raw_data=False)
+        d_train = lgb.Dataset(self.X_train, label=self.y_train, free_raw_data=False)
 
         params = {
-            'objective': 'binary',
-            'metric': 'binary_logloss',
-            'boosting_type': 'dart',
+            'objective': self.custom_loss,  # Pass custom objective function
+            'metric': 'custom',  # Use custom metric
+            'is_unbalance': True,
         }
-        
-        # Setting up the early stopping rounds parameter
+
+        def tqdm_callback():
+            pbar = tqdm(total=500, desc="Training Progress")  
+            def callback(env):
+                if env.iteration % 10 == 0:
+                    pbar.update(10)
+            return callback
+
         self.model = lgb.train(
             params,
             d_train,
-            valid_sets=[d_valid],  
-            callbacks=[lgb.early_stopping(stopping_rounds=10, verbose=True)],  
-            num_boost_round=2000, 
+            feval=self.custom_eval,
+            callbacks=[tqdm_callback()],
+            num_boost_round=500,
         )
-
-        # This will print the optimal number of boosting rounds (trees)
-        print(f'Optimal number of trees: {self.model.best_iteration}')
 
 
     def backtest(self):
         if self.model is None:
             raise ValueError("Model is not trained yet.")
-        self.y_pred = self.pred_t(self.X_test, 0.8)  # Use your predict method
+        self.y_pred = self.pred_t(self.X_test, 0.99)  # Use your predict method
         report = classification_report(np.array(self.y_test), self.y_pred)  # Compare with y_test
         print(report)
 
     def save_model(self, filename):
-        if not os.path.exists(filename):
-            os.makedirs(filename)
+        directory = os.path.dirname(filename)  # Get the directory of the filename
+        if not os.path.exists(directory):
+            os.makedirs(directory)
         if self.model is None:
             raise ValueError("Model is not trained yet.")
-        pickle.dump(self.model, open(filename + '/lgb_model.pkl', 'wb'))
+        with open(os.path.join(filename, 'lgb_model.pkl'), 'wb') as f:
+            pickle.dump(self.model, f)
 
     def load_model(self, filename):
-        self.model = pickle.load(open(filename + '/lgb_model.pkl', 'rb'))
+        with open(os.path.join(filename, 'lgb_model.pkl'), 'rb') as f:
+            self.model = pickle.load(f)
         return self.model
+
     def plot_candlestick_with_predictions(
         self,
         output_dir="../output/plots",
@@ -193,11 +228,11 @@ if __name__ == "__main__":
     data = preprocessor.data
 
 
-    model = LightGBMModel(split_perc=0.99)
+    model = LightGBMModel(split_perc=0.97)
     model.set_data(data)
     model.preprocess_data()
     model.train()
     model.plot_feature_importances()
     model.backtest()
     model.plot_candlestick_with_predictions()
-    model.save_model("../models")
+    model.save_model(os.path.join("..", "models"))

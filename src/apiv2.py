@@ -2,16 +2,16 @@ import json
 import csv
 from websocket import WebSocketApp
 import datetime
-
 import pandas as pd
+import os
+
 from preprocess import *
 from model import *
-import os
 from utils import *
 
-LIVE_DATA_PATH = "../data/live.csv"
+# Using os.path.join to make paths cross-compatible
+LIVE_DATA_PATH = os.path.join("..", "data", "live.csv")
 APIKEY = "iAfvumytfgq4EvTak20t8uuxCxVETG7v"
-
 
 class PolygonClient:
     def __init__(self):
@@ -21,7 +21,7 @@ class PolygonClient:
         self.live_df = None
         self.processor = DataPreprocessor()
         self.model = LightGBMModel()
-        self.model.load_model("../models")
+        self.model.load_model(os.path.join("..", "models"))
 
     def on_message(self, ws, message):
         data = json.loads(message)
@@ -58,7 +58,7 @@ class PolygonClient:
                         self.dates = None
                         self.predictions = None
                     else:
-                        self.predictions = self.model.pred_t(df=self.processed_df, thresh=0.6)
+                        self.predictions = self.model.pred_t(df=self.processed_df, thresh=0.5)
                         self.dates = self.live_df.iloc[-self.processed_df.shape[0]:]["datetime"]
 
                 print(self.live_df)

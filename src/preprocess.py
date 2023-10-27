@@ -1,15 +1,20 @@
 import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.decomposition import FastICA
+from sklearn.preprocessing import StandardScaler
 import pandas as pd
 import ta
 from tqdm import tqdm
 import warnings
 import plotly.graph_objects as go
+import os
 
 from utils import read_df
 
 warnings.simplefilter("ignore")
 
-DATA_PATH = '../data/L.csv'
+# Using os.path.join for cross-OS compatibility
+DATA_PATH = os.path.join('..', 'data', 'main.csv')
 
 class DataPreprocessor:
     def __init__(self, path = DATA_PATH):
@@ -64,6 +69,17 @@ class DataPreprocessor:
         self.data['Hour_Cos'] = np.cos(self.data['Hour'] * (2. * np.pi / 24))
         self.data['Minute_Sin'] = np.sin(self.data['Minute'] * (2. * np.pi / 60))
         self.data['Minute_Cos'] = np.cos(self.data['Minute'] * (2. * np.pi / 60))
+
+    def add_summaries(self):
+        for col in ['open', 'high', 'low', 'close']:
+            rolling_window = self.data[col].rolling(window=20)
+            self.data[f'{col}_min_10'] = rolling_window.min()
+            self.data[f'{col}_25th_10'] = rolling_window.quantile(0.25)
+            self.data[f'{col}_median_10'] = rolling_window.median()
+            self.data[f'{col}_75th_10'] = rolling_window.quantile(0.75)
+            self.data[f'{col}_max_10'] = rolling_window.max()
+            self.data[f'{col}_mean_10'] = rolling_window.mean()
+            self.data[f'{col}_std_10'] = rolling_window.std()
 
     def add_technical_indicators(self):
         self.data['SMA_10'] = ta.trend.sma_indicator(self.data['close'], window=10)
@@ -139,7 +155,7 @@ class DataPreprocessor:
         self.handle_missing_values()
         return self.data
 
-    def analyze_sharp_changes(self, data, window_size=30, price_diff_threshold=50, tolerance=1):
+    def analyze_sharp_changes(self, data, window_size=30, price_diff_threshold=20, tolerance=1):
         """
         Analyze the data for sharp changes, compute related products, and assign buy/sell/hold signals.
         
@@ -153,30 +169,33 @@ class DataPreprocessor:
         - data (pd.DataFrame): DataFrame with the new columns.
         """
         
-        rolling_min = data['close'].rolling(window_size).min()
-        rolling_max = data['close'].rolling(window_size).max()
-        
-        price_diff = rolling_max - rolling_min
-        sharp_changes_idx = np.where(price_diff >= price_diff_threshold)[0]
-        sharp_changes_idx = sharp_changes_idx[sharp_changes_idx < len(data) - window_size + 1]
-        sharp_changes_info = []
-        for idx in sharp_changes_idx:
-            min_price = rolling_min.iloc[idx]
-            max_price = rolling_max.iloc[idx]
-            actual_price = data['close'].iloc[idx]
-            if np.abs(actual_price - min_price) > np.abs(max_price - actual_price):
-                change_start_price = min_price
-                change_magnitude = actual_price - min_price
-            else:
-                change_start_price = max_price
-                change_magnitude = max_price - actual_price
-            
-            if not any(np.abs(change_start_price - prev_price) < window_size for prev_price, _ in sharp_changes_info):
-                sharp_changes_info.append((change_start_price, change_magnitude))
-        
-        # Sort the changes by magnitude in descending order, extract the prices, and then sort by price
-        lines = sorted([price for price, _ in sorted(sharp_changes_info, key=lambda x: x[1], reverse=True)])
-        data = data[data['close'] >= (10000 - 20)]
+        # rolling_min = data['close'].rolling(window_size).min()
+        # rolling_max = data['close'].rolling(window_size).max()
+        # 
+        # price_diff = rolling_max - rolling_min
+        # sharp_changes_idx = np.where(price_diff >= price_diff_threshold)[0]
+        # sharp_changes_idx = sharp_changes_idx[sharp_changes_idx < len(data) - window_size + 1]
+        # sharp_changes_info = []
+        # for idx in sharp_changes_idx:
+        #     min_price = rolling_min.iloc[idx]
+        #     max_price = rolling_max.iloc[idx]
+        #     actual_price = data['close'].iloc[idx]
+        #     if np.abs(actual_price - min_price) > np.abs(max_price - actual_price):
+        #         change_start_price = min_price
+        #         change_magnitude = actual_price - min_price
+        #     else:
+        #         change_start_price = max_price
+        #         change_magnitude = max_price - actual_price
+        #     
+        #     if not any(np.abs(change_start_price - prev_price) < window_size for prev_price, _ in sharp_changes_info):
+        #         sharp_changes_info.append((change_start_price, change_magnitude))
+        # 
+        # # Sort the changes by magnitude in descending order, extract the prices, and then sort by price
+        # lines = sorted([price for price, _ in sorted(sharp_changes_info, key=lambda x: x[1], reverse=True)])
+        # data = data[data['close'] >= (10000 - 20)]
+
+        rs_lines_path = os.path.join('..', 'data', 'stronglines.csv')
+        rs_lines = pd.read_csv(rs_lines_path)
 
         close_prices = data['close'].values[:, np.newaxis]
         lines = np.array(lines)
@@ -186,15 +205,16 @@ class DataPreprocessor:
         partitioned_indices = np.argpartition(np.abs(diffs), 4, axis=1)[:, :4]
         closest_diffs = np.take_along_axis(diffs, partitioned_indices, axis=1)
         closest_rs_values = np.take_along_axis(lines_reshaped, partitioned_indices, axis=1)
-        # product_values = closest_diffs * closest_rs_values
 
-        # data['SL_1'] = product_values[:, 0]
-        # data['SL_2'] = product_values[:, 1]
-        # data['SL_3'] = product_values[:, 2]
-        # data['SL_4'] = product_values[:, 3]
+        product_values = closest_diffs * closest_rs_values
+
+        data['SL_1'] = product_values[:, 0]
+        data['SL_2'] = product_values[:, 1]
+        data['SL_3'] = product_values[:, 2]
+        data['SL_4'] = product_values[:, 3]
 
         data['target'] = np.nan
-        tolerance = 1
+        tolerance = 3
         close_prices = data['close'].values[:, np.newaxis]
         diffs = np.abs(lines_reshaped - close_prices)
         within_tolerance_indices = np.where(diffs <= tolerance)
@@ -211,21 +231,56 @@ class DataPreprocessor:
         data['target'].fillna(method='bfill', inplace=True)
         data.dropna(subset=['target'], inplace=True)
         diffs = data['target'] - data['close']
-        data['target'] = np.where(diffs > 0, 1, np.where(diffs < 0, -1, 0))
+        data['target'] = np.where(diffs > tolerance, 1, np.where(diffs < tolerance, -1, 0))
         
         return data 
-                    
+
+    def apply_ica(self, n_components=None):
+        """
+        Apply ICA on the dataset after scaling while preserving the 'target' column.
+        
+        Parameters:
+        - n_components (int or None): number of components to keep. If None, all components will be kept.
+        
+        Returns:
+        - transformed_data (pd.DataFrame): data transformed using ICA with 'target' appended
+        """
+        
+        # First, save the 'target' column
+        target_col = self.data['target']
+        
+        # Drop 'target' from data to prepare for scaling and ICA
+        data_without_target = self.data.drop(columns=['target'])
+
+        # Scale the data
+        scaler = StandardScaler()
+        scaled_data = scaler.fit_transform(data_without_target)
+
+        # Apply ICA
+        ica = FastICA(n_components=n_components, random_state=0)
+        transformed_data = ica.fit_transform(scaled_data)
+        
+        # Convert transformed data back to a DataFrame for consistency
+        columns = [f"IC{i+1}" for i in range(transformed_data.shape[1])]
+        transformed_data = pd.DataFrame(transformed_data, columns=columns)
+        
+        # Append the 'target' column back to the transformed data
+        transformed_data['target'] = target_col
+
+        return transformed_data
 
     def transform_for_training(self, n = None):
         self.data = read_df(DATA_PATH, n) 
         self.data = self.analyze_sharp_changes(self.data)
         self.add_time_features()
+        self.add_summaries()
         self.add_technical_indicators()
         self.handle_missing_values()
+        # self.data = self.apply_ica(3)
         return self.data
 
 if __name__ == "__main__":
     preprocessor = DataPreprocessor()
-    preprocessor.transform_for_training()
+    preprocessor.transform_for_training(n=45000)
     preprocessor.plot_candlestick_with_signals()
     print(preprocessor.data.head())
