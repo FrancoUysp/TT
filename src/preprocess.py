@@ -13,16 +13,20 @@ from utils import read_df
 
 warnings.simplefilter("ignore")
 
-# Using os.path.join for cross-OS compatibility
 DATA_PATH = os.path.join('..', 'data', 'main.csv')
 
 class DataPreprocessor:
-    def __init__(self, path = DATA_PATH):
-        self.path = path
+    def __init__(self, input_data= DATA_PATH):
+        if isinstance(input_data, str):  
+            self.data = read_df(input_data)  
+        elif isinstance(input_data, pd.DataFrame):  
+            self.data = input_data
+        else:
+            raise ValueError("Invalid input. Please provide a file path or a DataFrame.")
+    
     def plot_candlestick_with_signals(self, output_file=None):
         fig = go.Figure()
 
-        # Create the candlestick trace
         fig.add_trace(go.Candlestick(x=self.data.index,
                 open=self.data['open'],
                 high=self.data['high'],
@@ -30,7 +34,6 @@ class DataPreprocessor:
                 close=self.data['close'],
                 name='Candlesticks'))
 
-        # Create traces for buy and sell signals
         buy_signals = self.data[self.data['target'] == 1]
         sell_signals = self.data[self.data['target'] == -1]
 
@@ -42,7 +45,6 @@ class DataPreprocessor:
                                  mode='markers', name='Sell Signals',
                                  marker=dict(color='red', size=10, symbol='triangle-down')))
 
-        # Update layout
         fig.update_layout(
             title='Candlestick Chart with Buy/Sell Signals',
             xaxis_title='Date',
@@ -52,9 +54,9 @@ class DataPreprocessor:
         )
 
         if output_file:
-            fig.write_html(output_file)  # Save to file
+            fig.write_html(output_file)  
         else:
-            fig.show()  # Show the plot
+            fig.show()  
 
     def add_time_features(self):
         self.data['Year'] = self.data['datetime'].dt.year

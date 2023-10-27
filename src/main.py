@@ -1,22 +1,19 @@
-from logging import debug
 import dash
 from dash import dcc, html
 import plotly.graph_objs as go
 from dash.dependencies import Output, Input
-import asyncio
 from apiv2 import *
 from preprocess import *
-import threading
 from utils import *
-
+from preprocess import DataPreprocessor
 from model import LightGBMModel 
 
 
 class DashApp:
 
     def __init__(self):
-        # Initialize the app
-        self.threads = 0
+        self.processor = DataPreprocessor()
+        self.model = LightGBMModel()
         self.app = dash.Dash(__name__)
 
         self.previous_predictions = None
@@ -24,7 +21,6 @@ class DashApp:
         update_main()
         self.buffer_data = create_buffer_queue()
         
-        self.api = PolygonClient()  # Assuming APIKEY is defined
         self._set_layout()
         self._set_callback()
 
@@ -42,32 +38,29 @@ class DashApp:
             ),
             dcc.Interval(
                 id='interval-component',
-                interval=1*1000,
+                interval=5*1000,  
                 n_intervals=0
             )
         ])
 
     def _set_callback(self):
+
+        self.buffer_data = append_to_buffer_and_update_main(self.buffer_data)
+        buffer_data = self.buffer_data
+        preprocessed_data = self.processor.transform_for_pred(self.buffer_data.copy())
+        predictions = self.model.pred_t(df=preprocessed_data, thresh=0.5)
+        dates = buffer_data.iloc[-preprocessed_data.shape[0]:]["datetime"]
+        self.previous_predictions = predictions 
+
         @self.app.callback(
             Output('live-plot', 'figure'),
             Input('interval-component', 'n_intervals')
         )
-        def update_graph(n_intervals):
-#######################################################################################################
-            preprocessed_data, dates, predictions = self.api.get_agg_dat()  # Changed to get_agg_dat
-            if np.array_equal(self.previous_predictions, predictions):
-                raise dash.exceptions.PreventUpdate
 
-            if preprocessed_data is None or dates is None or predictions is None or preprocessed_data.empty:
-                return go.Figure()  
-
-            self.previous_predictions = predictions
+        def update_figure(n): 
             str_dates = dates.astype(str).tolist()
-
-            # Create a new figure
             figure = go.Figure()
             
-            # Candlestick trace
             figure.add_trace(
                 go.Candlestick(
                     x=str_dates,
@@ -79,9 +72,8 @@ class DashApp:
                 )
             )
 
-            # Predicted Buy/Sell signal trace
-            predicted_buy_indices = np.where(predictions == 1)[0]
-            predicted_sell_indices = np.where(predictions == -1)[0]
+            predicted_buy_indices = np.where(predictions== 1)[0]
+            predicted_sell_indices = np.where(predictions== -1)[0]
 
             predicted_buy_dates = [str_dates[i] for i in predicted_buy_indices]
             predicted_sell_dates = [str_dates[i] for i in predicted_sell_indices]
@@ -108,31 +100,19 @@ class DashApp:
                     marker=dict(color="magenta", size=12, symbol="circle"),
                 )
             )
-            # Layout adjustments
             figure.update_layout(
                 title="Candlestick Chart with Predicted Buy/Sell Signals",
                 xaxis_title="Date",
                 yaxis_title="Price",
                 template="plotly_dark",
                 xaxis_rangeslider_visible=False,
-                xaxis=dict(type="category")  # Here's the change to force the xaxis to be categorical
+                xaxis=dict(type="category")  
             )
 
             return figure
-####################################################################################################
-    def run_websocket(self):
-        self.api.connect()
 
     def run(self):
-        if self.threads == 0:
-            self.threads = 1
-            ws_thread = threading.Thread(target=self.run_websocket)
-            ws_thread.start()
-            print("WebSocket thread started")
-
-        if self.threads == 1:
-            print("Starting the Dash app")
-            self.app.run_server(host = "0.0.0.0", debug=False)
+        self.app.run_server(host = "0.0.0.0", debug=False)
 
 
 if __name__ == '__main__':
