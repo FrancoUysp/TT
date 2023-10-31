@@ -2,12 +2,13 @@ import dash
 from dash import dcc, html
 import plotly.graph_objs as go
 from dash.dependencies import Output, Input
+import threading
+import time
 from apiv2 import *
 from preprocess import *
 from utils import *
 from preprocess import DataPreprocessor
-from model import LightGBMModel 
-
+from model import LightGBMModel
 
 class DashApp:
 
@@ -16,14 +17,23 @@ class DashApp:
         self.model = LightGBMModel()
         self.model.load_model(os.path.join("..", "models"))
         self.app = dash.Dash(__name__)
-
         self.previous_predictions = None
-
         update_main()
         self.buffer_data = create_buffer_queue()
-        
         self._set_layout()
         self._set_callback()
+
+        # Initialize threading
+        self.stop_event = threading.Event()
+        self.bg_thread = threading.Thread(target=self.update_predictions, args=(self.stop_event,))
+
+    def update_predictions(self, stop_event):
+        while not stop_event.is_set():
+            self.buffer_data = append_to_buffer_and_update_main(self.buffer_data)
+            preprocessed_data = self.processor.transform_for_pred(self.buffer_data.copy())
+            predictions = self.model.pred_t(df=preprocessed_data, thresh=0.78)
+            self.previous_predictions = predictions
+            time.sleep(5)
 
     def _set_layout(self):
         self.app.layout = html.Div(style={
@@ -39,26 +49,23 @@ class DashApp:
             ),
             dcc.Interval(
                 id='interval-component',
-                interval=5*1000,  
+                interval=5 * 1000,
                 n_intervals=0
             )
         ])
 
     def _set_callback(self):
-
-        self.buffer_data = append_to_buffer_and_update_main(self.buffer_data)
-        buffer_data = self.buffer_data
-        preprocessed_data = self.processor.transform_for_pred(self.buffer_data.copy())
-        predictions = self.model.pred_t(df=preprocessed_data, thresh=0.5)
-        dates = buffer_data.iloc[-preprocessed_data.shape[0]:]["datetime"]
-        self.previous_predictions = predictions 
-
         @self.app.callback(
             Output('live-plot', 'figure'),
             Input('interval-component', 'n_intervals')
         )
 
         def update_figure(n): 
+            self.buffer_data = append_to_buffer_and_update_main(self.buffer_data)
+            preprocessed_data = self.processor.transform_for_pred(self.buffer_data.copy())
+            predictions = self.model.pred_t(df=preprocessed_data, thresh=0.78)
+            dates = self.buffer_data.iloc[-preprocessed_data.shape[0]:]["datetime"]
+            self.previous_predictions = predictions 
             str_dates = dates.astype(str).tolist()
             figure = go.Figure()
             
@@ -113,8 +120,21 @@ class DashApp:
             return figure
 
     def run(self):
-        self.app.run_server(host = "0.0.0.0", debug=False)
+        # Start background thread
+        self.bg_thread.start()
+        self.app.run_server(host="0.0.0.0", debug=False)
 
+    def stop(self):
+        # Stop the background thread
+        self.stop_event.set()
+        self.bg_thread.join()
+
+if __name__ == '__main__':
+    app = DashApp()
+    try:
+        app.run()
+    finally:
+        app.stop()
 
 if __name__ == '__main__':
     app = DashApp()

@@ -20,7 +20,8 @@ class LightGBMModel:
 
     def pred_t(self, df, thresh=0.6):
         X = df.apply(pd.to_numeric, errors="coerce").dropna()
-        y_pred_proba = self.model.predict(X, num_iteration=self.model.best_iteration)  # Get predicted probabilities
+        print(X)
+        y_pred_proba = self.model.predict(X)  # Get predicted probabilities
         y_pred = np.where(
             y_pred_proba > thresh, 1,  # probability of class 1 > 0.6 => label 1
             np.where(

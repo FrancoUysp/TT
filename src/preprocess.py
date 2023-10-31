@@ -146,12 +146,14 @@ class DataPreprocessor:
 
     def transform_for_pred(self, data):
         self.data = data
+        self.data = self.analyze_sharp_changes(self.data, pred=True)
         self.add_time_features()
+        self.add_summaries()
         self.add_technical_indicators()
         self.handle_missing_values()
         return self.data
 
-    def analyze_sharp_changes(self, data, window_size=30, price_diff_threshold=20, tolerance=1):
+    def analyze_sharp_changes(self, data, window_size=30, price_diff_threshold=20, tolerance=1, pred = False):
         """
         Analyze the data for sharp changes, compute related products, and assign buy/sell/hold signals.
         
@@ -210,27 +212,29 @@ class DataPreprocessor:
         data['SL_3'] = product_values[:, 2]
         data['SL_4'] = product_values[:, 3]
 
-        data['target'] = np.nan
-        tolerance = 3
-        close_prices = data['close'].values[:, np.newaxis]
-        diffs = np.abs(lines_reshaped - close_prices)
-        within_tolerance_indices = np.where(diffs <= tolerance)
+        if not pred:
+            data['target'] = np.nan
+            tolerance = 3
+            close_prices = data['close'].values[:, np.newaxis]
+            diffs = np.abs(lines_reshaped - close_prices)
+            within_tolerance_indices = np.where(diffs <= tolerance)
 
-        data = data.reset_index(drop=True)
+            data = data.reset_index(drop=True)
 
-        # Ensure valid indices before assignment
-        valid_indices = set(data.index)
-        filtered_indices = [idx for idx in within_tolerance_indices[0] if idx in valid_indices]
+            # Ensure valid indices before assignment
+            valid_indices = set(data.index)
+            filtered_indices = [idx for idx in within_tolerance_indices[0] if idx in valid_indices]
 
-        data.loc[filtered_indices, 'target'] = lines_reshaped[0, within_tolerance_indices[1]]
+            data.loc[filtered_indices, 'target'] = lines_reshaped[0, within_tolerance_indices[1]]
 
-        data.loc[within_tolerance_indices[0], 'target'] = lines_reshaped[0, within_tolerance_indices[1]]
-        data['target'].fillna(method='bfill', inplace=True)
-        data.dropna(subset=['target'], inplace=True)
-        diffs = data['target'] - data['close']
-        data['target'] = np.where(diffs > tolerance, 1, np.where(diffs < tolerance, -1, 0))
-        
+            data.loc[within_tolerance_indices[0], 'target'] = lines_reshaped[0, within_tolerance_indices[1]]
+            data['target'].fillna(method='bfill', inplace=True)
+            data.dropna(subset=['target'], inplace=True)
+            diffs = data['target'] - data['close']
+            data['target'] = np.where(diffs > tolerance, 1, np.where(diffs < tolerance, -1, 0))
+            
         return data 
+            
     def transform_for_training(self, n = None):
         self.data = self.analyze_sharp_changes(self.data)
         self.add_time_features()
