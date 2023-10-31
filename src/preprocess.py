@@ -14,6 +14,7 @@ from utils import read_df
 warnings.simplefilter("ignore")
 
 DATA_PATH = os.path.join('..', 'data', 'main.csv')
+TOL = 1
 
 class DataPreprocessor:
     def __init__(self, input_data= DATA_PATH):
@@ -154,19 +155,8 @@ class DataPreprocessor:
         return self.data
 
     def analyze_sharp_changes(self, data, window_size=30, price_diff_threshold=20, tolerance=1, pred = False):
-        """
-        Analyze the data for sharp changes, compute related products, and assign buy/sell/hold signals.
-        
-        Parameters:
-        - data (pd.DataFrame): DataFrame with a 'Close' column containing closing prices.
-        - window_size (int): Size of the rolling window.
-        - price_diff_threshold (float): Threshold for detecting a sharp price change.
-        - tolerance (float): Threshold for proximity to sharp changes for buy/sell/hold signals.
 
-        Returns:
-        - data (pd.DataFrame): DataFrame with the new columns.
-        """
-        
+
         # rolling_min = data['close'].rolling(window_size).min()
         # rolling_max = data['close'].rolling(window_size).max()
         # 
@@ -192,8 +182,7 @@ class DataPreprocessor:
         # lines = sorted([price for price, _ in sorted(sharp_changes_info, key=lambda x: x[1], reverse=True)])
         # data = data[data['close'] >= (10000 - 20)]
 
-        rs_lines_path = os.path.join('..', 'data', 'stronglines.csv')
-        rs_lines = pd.read_csv(rs_lines_path)
+        rs_lines = pd.read_csv("data/stronglines.csv")
         lines = rs_lines.values.flatten()
 
         close_prices = data['close'].values[:, np.newaxis]
@@ -205,23 +194,19 @@ class DataPreprocessor:
         closest_diffs = np.take_along_axis(diffs, partitioned_indices, axis=1)
         closest_rs_values = np.take_along_axis(lines_reshaped, partitioned_indices, axis=1)
 
-        product_values = closest_diffs * closest_rs_values
-
-        data['SL_1'] = product_values[:, 0]
-        data['SL_2'] = product_values[:, 1]
-        data['SL_3'] = product_values[:, 2]
-        data['SL_4'] = product_values[:, 3]
-
+        data['SL_1'] = closest_diffs[:, 0]
+        data['SL_2'] = closest_diffs[:, 1]
+        data['SL_3'] = closest_diffs[:, 2]
+        data['SL_4'] = closest_diffs[:, 3]
         if not pred:
             data['target'] = np.nan
-            tolerance = 3
+            tolerance = TOL
             close_prices = data['close'].values[:, np.newaxis]
             diffs = np.abs(lines_reshaped - close_prices)
             within_tolerance_indices = np.where(diffs <= tolerance)
 
             data = data.reset_index(drop=True)
 
-            # Ensure valid indices before assignment
             valid_indices = set(data.index)
             filtered_indices = [idx for idx in within_tolerance_indices[0] if idx in valid_indices]
 
@@ -231,8 +216,8 @@ class DataPreprocessor:
             data['target'].fillna(method='bfill', inplace=True)
             data.dropna(subset=['target'], inplace=True)
             diffs = data['target'] - data['close']
-            data['target'] = np.where(diffs > tolerance, 1, np.where(diffs < tolerance, -1, 0))
-            
+            data['target'] = np.where(diffs > 0, 1, np.where(diffs < 0, -1, 0))
+
         return data 
             
     def transform_for_training(self, n = None):

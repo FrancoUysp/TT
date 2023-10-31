@@ -27,11 +27,15 @@ class DashApp:
         self.stop_event = threading.Event()
         self.bg_thread = threading.Thread(target=self.update_predictions, args=(self.stop_event,))
 
+        self.initial_capital = 20000
+        self.capital_over_time = [self.initial_capital]
+        self.monthly_returns = []
+
     def update_predictions(self, stop_event):
         while not stop_event.is_set():
             self.buffer_data = append_to_buffer_and_update_main(self.buffer_data)
             preprocessed_data = self.processor.transform_for_pred(self.buffer_data.copy())
-            predictions = self.model.pred_t(df=preprocessed_data, thresh=0.78)
+            predictions = self.model.pred_t(df=preprocessed_data, thresh=0.5)
             self.previous_predictions = predictions
             time.sleep(5)
 
