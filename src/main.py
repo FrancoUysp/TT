@@ -32,7 +32,7 @@ class DashApp:
         while not stop_event.is_set():
             self.buffer_data = append_to_buffer_and_update_main(self.buffer_data)
             self.preprocessed_data = self.processor.transform_for_pred(self.buffer_data.copy())
-            self.predictions = self.model.pred_t(df=self.preprocessed_data, thresh=0.9)
+            self.predictions = self.model.pred_t(df=self.preprocessed_data, thresh=0.75)
             self.previous_predictions = self.predictions
             time.sleep(5)
 
