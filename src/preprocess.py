@@ -72,18 +72,6 @@ class DataPreprocessor:
         self.data['Hour_Cos'] = np.cos(self.data['Hour'] * (2. * np.pi / 24))
         self.data['Minute_Sin'] = np.sin(self.data['Minute'] * (2. * np.pi / 60))
         self.data['Minute_Cos'] = np.cos(self.data['Minute'] * (2. * np.pi / 60))
-        self.data.drop(columns=['datetime'], inplace=True)
-
-    def add_summaries(self):
-        for col in ['open', 'high', 'low', 'close']:
-            rolling_window = self.data[col].rolling(window=20)
-            self.data[f'{col}_min_10'] = rolling_window.min()
-            self.data[f'{col}_25th_10'] = rolling_window.quantile(0.25)
-            self.data[f'{col}_median_10'] = rolling_window.median()
-            self.data[f'{col}_75th_10'] = rolling_window.quantile(0.75)
-            self.data[f'{col}_max_10'] = rolling_window.max()
-            self.data[f'{col}_mean_10'] = rolling_window.mean()
-            self.data[f'{col}_std_10'] = rolling_window.std()
 
     def add_technical_indicators(self):
         self.data['SMA_10'] = ta.trend.sma_indicator(self.data['close'], window=10)
@@ -109,7 +97,6 @@ class DataPreprocessor:
         self.data['ROC'] = ta.momentum.ROCIndicator(self.data['close']).roc()
         self.data['PPO'] = ta.momentum.PercentagePriceOscillator(self.data['close']).ppo()
 
-        # Ichimoku Cloud
         self.data['Ichimoku_Conversion'] = (self.data['high'].rolling(window=9).max() + self.data['low'].rolling(window=9).min()) / 2
         self.data['Ichimoku_Base'] = (self.data['high'].rolling(window=26).max() + self.data['low'].rolling(window=26).min()) / 2
         self.data['Ichimoku_Leading_A'] = (self.data['Ichimoku_Conversion'] + self.data['Ichimoku_Base']) / 2
@@ -123,8 +110,8 @@ class DataPreprocessor:
 
         self.data['ATRP'] = ta.volatility.AverageTrueRange(self.data['high'], self.data['low'], self.data['close']).average_true_range()
 
-        self.data['Historical_Volatility'] = self.data['close'].rolling(window=10).std() * (252**0.5)  # Annualized volatility
-        self.data['Price_Oscillator'] = self.data['close'].diff(4)  # Difference between the current price and the price 4 periods ago
+        self.data['Historical_Volatility'] = self.data['close'].rolling(window=10).std() * (252**0.5)  
+        self.data['Price_Oscillator'] = self.data['close'].diff(4)  
         self.data['Standard_Deviation'] = self.data['close'].rolling(window=14).std()
 
         self.data['CCI'] = ta.trend.CCIIndicator(self.data['high'], self.data['low'], self.data['close']).cci()
@@ -134,12 +121,14 @@ class DataPreprocessor:
         self.data['Donchian_Channel_lband'] = donchian.donchian_channel_lband()
         self.data['Donchian_Channel_mband'] = donchian.donchian_channel_mband()
 
-        self.data['DPO'] = ta.trend.DPOIndicator(self.data['close']).dpo()
+        kst = ta.trend.KSTIndicator(self.data['close'])
+        self.data['KST'] = kst.kst()
+        self.data['KST_Signal'] = kst.kst_sig()
 
-        typical_price = (self.data['high'] + self.data['low'] + self.data['close']) / 3
-        self.data['MFI'] = ta.volume.MFIIndicator(high=self.data['high'], low=self.data['low'], close=self.data['close'], volume=typical_price).money_flow_index()
+        self.data['TRIX'] = ta.trend.TRIXIndicator(self.data['close']).trix()
 
-        self.data['Trix'] = ta.trend.TRIXIndicator(self.data['close']).trix()
+
+        self.data.drop(columns=['datetime'], inplace=True)
 
 
     def handle_missing_values(self):
@@ -147,10 +136,9 @@ class DataPreprocessor:
 
     def transform_for_pred(self, data):
         self.data = data
-        self.data = self.analyze_sharp_changes(self.data, pred=True)
         self.add_time_features()
-        self.add_summaries()
         self.add_technical_indicators()
+        self.data = self.analyze_sharp_changes(self.data, pred=True)
         self.handle_missing_values()
         return self.data
 
