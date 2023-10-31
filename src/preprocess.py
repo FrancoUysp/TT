@@ -182,7 +182,7 @@ class DataPreprocessor:
         # lines = sorted([price for price, _ in sorted(sharp_changes_info, key=lambda x: x[1], reverse=True)])
         # data = data[data['close'] >= (10000 - 20)]
 
-        rs_lines = pd.read_csv("data/stronglines.csv")
+        rs_lines = pd.read_csv("../data/stronglines.csv")
         lines = rs_lines.values.flatten()
 
         close_prices = data['close'].values[:, np.newaxis]
@@ -232,4 +232,3 @@ if __name__ == "__main__":
     preprocessor = DataPreprocessor()
     preprocessor.transform_for_training(n=45000)
     preprocessor.plot_candlestick_with_signals()
-    print(preprocessor.data.head())

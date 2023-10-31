@@ -20,16 +20,14 @@ class LightGBMModel:
 
     def pred_t(self, df, thresh=0.6):
         X = df.apply(pd.to_numeric, errors="coerce").dropna()
-        print(X)
-        y_pred_proba = self.model.predict(X)  # Get predicted probabilities
+        y_pred_proba = self.model.predict_proba(X)[:, 1]  # Get probability of class 1
         y_pred = np.where(
-            y_pred_proba > thresh, 1,  # probability of class 1 > 0.6 => label 1
+            y_pred_proba > thresh, 1,  # If probability of class 1 > 0.6, predict 1
             np.where(
-                (1 - y_pred_proba) > thresh, -1,
-                0  
+                (1 - y_pred_proba) > thresh, -1,  # If probability of class 0 > 0.6, predict -1
+                0  # Otherwise, predict 0
             )
         )
-        print(y_pred)
         return y_pred
 
     def set_data(self, data):
@@ -127,7 +125,7 @@ class LightGBMModel:
             pickle.dump(self.model, f)
 
     def load_model(self, filename):
-        with open(os.path.join(filename, 'lgb_model.pkl'), 'rb') as f:
+        with open(os.path.join(filename, 'trained_catboost_model.pkl'), 'rb') as f:
             self.model = pickle.load(f)
         return self.model
 

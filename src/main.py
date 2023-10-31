@@ -9,6 +9,7 @@ from preprocess import *
 from utils import *
 from preprocess import DataPreprocessor
 from model import LightGBMModel
+import catboost
 
 class DashApp:
 
@@ -27,16 +28,12 @@ class DashApp:
         self.stop_event = threading.Event()
         self.bg_thread = threading.Thread(target=self.update_predictions, args=(self.stop_event,))
 
-        self.initial_capital = 20000
-        self.capital_over_time = [self.initial_capital]
-        self.monthly_returns = []
-
     def update_predictions(self, stop_event):
         while not stop_event.is_set():
             self.buffer_data = append_to_buffer_and_update_main(self.buffer_data)
-            preprocessed_data = self.processor.transform_for_pred(self.buffer_data.copy())
-            predictions = self.model.pred_t(df=preprocessed_data, thresh=0.5)
-            self.previous_predictions = predictions
+            self.preprocessed_data = self.processor.transform_for_pred(self.buffer_data.copy())
+            self.predictions = self.model.pred_t(df=self.preprocessed_data, thresh=0.9)
+            self.previous_predictions = self.predictions
             time.sleep(5)
 
     def _set_layout(self):
@@ -65,33 +62,29 @@ class DashApp:
         )
 
         def update_figure(n): 
-            self.buffer_data = append_to_buffer_and_update_main(self.buffer_data)
-            preprocessed_data = self.processor.transform_for_pred(self.buffer_data.copy())
-            predictions = self.model.pred_t(df=preprocessed_data, thresh=0.78)
-            dates = self.buffer_data.iloc[-preprocessed_data.shape[0]:]["datetime"]
-            self.previous_predictions = predictions 
-            str_dates = dates.astype(str).tolist()
+            self.dates = self.buffer_data.iloc[-self.preprocessed_data.shape[0]:]["datetime"]
+            str_dates = self.dates.astype(str).tolist()
             figure = go.Figure()
             
             figure.add_trace(
                 go.Candlestick(
                     x=str_dates,
-                    open=preprocessed_data['open'],
-                    high=preprocessed_data['high'],
-                    low=preprocessed_data['low'],
-                    close=preprocessed_data['close'],
+                    open=self.preprocessed_data['open'],
+                    high=self.preprocessed_data['high'],
+                    low=self.preprocessed_data['low'],
+                    close=self.preprocessed_data['close'],
                     name="Candlesticks"
                 )
             )
 
-            predicted_buy_indices = np.where(predictions== 1)[0]
-            predicted_sell_indices = np.where(predictions== -1)[0]
+            predicted_buy_indices = np.where(self.predictions== 1)[0]
+            predicted_sell_indices = np.where(self.predictions== -1)[0]
 
             predicted_buy_dates = [str_dates[i] for i in predicted_buy_indices]
             predicted_sell_dates = [str_dates[i] for i in predicted_sell_indices]
 
-            predicted_buy_close_values = preprocessed_data['close'].iloc[predicted_buy_indices]
-            predicted_sell_close_values = preprocessed_data['close'].iloc[predicted_sell_indices]
+            predicted_buy_close_values =self.preprocessed_data['close'].iloc[predicted_buy_indices]
+            predicted_sell_close_values = self.preprocessed_data['close'].iloc[predicted_sell_indices]
 
             figure.add_trace(
                 go.Scatter(
@@ -116,6 +109,7 @@ class DashApp:
                 title="Candlestick Chart with Predicted Buy/Sell Signals",
                 xaxis_title="Date",
                 yaxis_title="Price",
+
                 template="plotly_dark",
                 xaxis_rangeslider_visible=False,
                 xaxis=dict(type="category")  

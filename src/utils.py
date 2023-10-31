@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime as dt, timedelta
 import time
 
-BUFFER_SIZE = 150 
+BUFFER_SIZE = 180 
 
 def read_df(file_loc, n=None):
     "Used to read main.csv etc"
