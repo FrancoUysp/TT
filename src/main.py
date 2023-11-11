@@ -2,9 +2,7 @@ import dash
 from dash import dcc, html
 import plotly.graph_objs as go
 from dash.dependencies import Output, Input
-import threading
-import time
-from apiv2 import *
+import threading import time from apiv2 import *
 from preprocess import *
 from utils import *
 from preprocess import DataPreprocessor
@@ -26,17 +24,17 @@ class DashApp:
         self.predictions = []
 
 
-        # Initialize threading
-        self.stop_event = threading.Event()
-        self.bg_thread = threading.Thread(target=self.update_predictions, args=(self.stop_event,))
+    #     # Initialize threading
+    #     self.stop_event = threading.Event()
+    #     self.bg_thread = threading.Thread(target=self.update_predictions, args=(self.stop_event,))
 
-    def update_predictions(self, stop_event):
-        while not stop_event.is_set():
-            self.buffer_data = append_to_buffer_and_update_main(self.buffer_data)
-            self.preprocessed_data = self.processor.transform_for_pred(self.buffer_data.copy())
-            self.predictions = self.model.pred_t(df=self.preprocessed_data, thresh=0.5)
-            self.previous_predictions = self.predictions
-            time.sleep(5)
+    # def update_predictions(self, stop_event):
+    #     while not stop_event.is_set():
+    #         self.buffer_data = append_to_buffer_and_update_main(self.buffer_data)
+    #         self.preprocessed_data = self.processor.transform_for_pred(self.buffer_data.copy())
+    #         self.predictions = self.model.pred_t(df=self.preprocessed_data, thresh=0.5)
+    #         self.previous_predictions = self.predictions
+            # time.sleep(5)
 
     def _set_layout(self):
         self.app.layout = html.Div(style={
@@ -64,8 +62,12 @@ class DashApp:
         )
 
         def update_figure(n): 
-            self.dates = self.buffer_data.iloc[-self.preprocessed_data.shape[0]:]["datetime"]
-            str_dates = self.dates.astype(str).tolist()
+            # self.dates = self.buffer_data.iloc[-self.preprocessed_data.shape[0]:]["datetime"]
+            # str_dates = self.dates.astype(str).tolist()
+
+            self.preprocessed_data = read_df("../data/main.csv", n = 100)["datetime"]
+            self.dates = self.preprocessed_data["datetime"]
+
             figure = go.Figure()
             
             figure.add_trace(
@@ -79,34 +81,34 @@ class DashApp:
                 )
             )
 
-            predicted_buy_indices = np.where(self.predictions== 1)[0]
-            predicted_sell_indices = np.where(self.predictions== -1)[0]
+            # predicted_buy_indices = np.where(self.predictions== 1)[0]
+            # predicted_sell_indices = np.where(self.predictions== -1)[0]
 
-            predicted_buy_dates = [str_dates[i] for i in predicted_buy_indices]
-            predicted_sell_dates = [str_dates[i] for i in predicted_sell_indices]
+            # predicted_buy_dates = [str_dates[i] for i in predicted_buy_indices]
+            # predicted_sell_dates = [str_dates[i] for i in predicted_sell_indices]
 
-            predicted_buy_close_values =self.preprocessed_data['close'].iloc[predicted_buy_indices]
-            predicted_sell_close_values = self.preprocessed_data['close'].iloc[predicted_sell_indices]
+            # predicted_buy_close_values =self.preprocessed_data['close'].iloc[predicted_buy_indices]
+            # predicted_sell_close_values = self.preprocessed_data['close'].iloc[predicted_sell_indices]
 
-            figure.add_trace(
-                go.Scatter(
-                    x=predicted_buy_dates,
-                    y=predicted_buy_close_values,
-                    mode="markers",
-                    name="Predicted Buy Signals",
-                    marker=dict(color="lime", size=12, symbol="circle"),
-                )
-            )
+            # figure.add_trace(
+            #     go.Scatter(
+            #         x=predicted_buy_dates,
+            #         y=predicted_buy_close_values,
+            #         mode="markers",
+            #         name="Predicted Buy Signals",
+            #         marker=dict(color="lime", size=12, symbol="circle"),
+            #     )
+            # )
 
-            figure.add_trace(
-                go.Scatter(
-                    x=predicted_sell_dates,
-                    y=predicted_sell_close_values,
-                    mode="markers",
-                    name="Predicted Sell Signals",
-                    marker=dict(color="magenta", size=12, symbol="circle"),
-                )
-            )
+            # figure.add_trace(
+            #     go.Scatter(
+            #         x=predicted_sell_dates,
+            #         y=predicted_sell_close_values,
+            #         mode="markers",
+            #         name="Predicted Sell Signals",
+            #         marker=dict(color="magenta", size=12, symbol="circle"),
+            #     )
+            # )
             figure.update_layout(
                 title="Candlestick Chart with Predicted Buy/Sell Signals",
                 xaxis_title="Date",

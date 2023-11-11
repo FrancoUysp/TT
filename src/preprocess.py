@@ -9,7 +9,7 @@ import warnings
 import plotly.graph_objects as go
 import os
 
-from utils import read_df
+from .utils import read_df
 
 warnings.simplefilter("ignore")
 

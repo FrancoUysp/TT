@@ -1,0 +1,137 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #111; /* Dark background */
+    color: #fff; /* Light text */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+}
+
+#title-container {
+    width: 100%;
+    text-align: center;
+    padding: 20px 0;
+    background-color: #222; /* Slightly lighter than the body for contrast */
+}
+
+#title {
+    color: #fff;
+    margin: 0;
+    padding: 20px 0;
+}
+
+#container {
+    display: flex;
+    flex-direction: row; /* This ensures the children are side-by-side */
+    width: 100%; /* Use full width of the viewport */
+    max-width: none; /* Remove the max-width if it was set */
+    margin: 0; /* Remove any margin if it was set */
+    height: calc(100vh - 60px); /* Adjust height if necessary */
+}
+
+#controls {
+    width: auto; /* Adjust if you want a wider or narrower panel */
+    background-color: #333;
+    padding: 20px;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0; /* Prevent the controls from shrinking */
+    z-index: 10; /* Ensure the z-index is higher than the graph container */
+    position: static;
+    top: 40px; /* Below the header */
+    left: 0;
+    height: auto;
+    box-shadow: none; /* Add some shadow for depth */
+    overflow-y: auto; /* In case content is too long */
+    transform: none; /* Start hidden */
+    transition: transform 0.3s ease-in-out;
+}
+
+#params-container {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 10px; /* Add some space before the buttons */
+}
+
+.param {
+    margin-bottom: 10px; /* Space out the parameters */
+}
+
+.param input, .dropdown {
+    width: 100%; /* Make inputs and dropdown take full width */
+    padding: 8px;
+    margin-top: 5px; /* Space above the input field */
+    border: 1px solid #555; /* Add border to inputs for definition */
+    background-color: #222;
+    color: #fff;
+    border-radius: 3px;
+}
+
+.action-button {
+    padding: 12px 20px;
+    margin: 10px 0;
+    background-color: #444; /* Dark background for buttons */
+    border: none;
+    color: #fff;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+}
+
+.action-button:hover {
+    opacity: 0.8; /* Slight transparency on hover */
+}
+
+#sell-all {
+    background-color: #ff4136; /* Red color for 'Sell All' */
+}
+
+#opt-out {
+    background-color: #2ecc40; /* Green color for 'Opt Out' */
+}
+
+#stats {
+    padding-top: 20px; /* Space above the stats */
+    border-top: 1px solid #555; /* Line to separate stats from buttons */
+}
+
+#stats span {
+    display: block; /* Each stat on a new line */
+    margin-bottom: 10px; /* Space between stats */
+    font-size: 1.1em; /* Make the font slightly larger */
+}
+
+#graph-container {
+    flex-grow: 1; /* This will make the graph container take up the remaining space */
+    width: auto; /* Allow the width to adjust to the space available */
+    margin: 0 10px;
+    background-color: #000; /* Dark background for the graph container */
+    border: 1px solid #222; /* Subtle border for the graph container */
+    border-radius: 5px;
+    position: static; /* Positioned absolutely to take full available space */
+    top: auto; /* Increased to avoid cutting off labels */
+    z-index: auto; /* Lower than the z-index of the controls */
+    left: 10px; /* Left margin for aesthetics */
+    right: 10px; /* Right margin for aesthetics */
+    bottom: 10px; /* Bottom margin for aesthetics */
+}
+
+
+@media (max-width: 768px) {
+    #container {
+        flex-direction: column;
+    }
+
+    #controls, #graph-container {
+        width: 95%; /* Adjust for smaller screens */
+        margin-bottom: 10px;
+    }
+
+    #stats {
+        align-items: center; /* Center stats on smaller screens */
+    }
+}

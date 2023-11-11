@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+ <meta charset="UTF-8">
+  <title>Trollope Trading - Finance Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+
+<body>
+  <header id="title-container">
+    <h1 id="title">Trollope Trading</h1>
+  </header>
+  <div id="container">
+
+    <div id="controls">
+      <select id="model-dropdown" class="dropdown">
+        <!-- Dynamically populated model options -->
+      </select>
+      <div id="params-container">
+        <div class="param">
+          <label for="param1">Param 1:</label>
+          <input type="text" id="param1" name="param1">
+        </div>
+        <!-- Add more parameters here if needed -->
+        <button id="set-params" class="action-button">Set</button>
+      </div>
+      <button id="sell-all" class="action-button">Sell All</button>
+      <button id="opt-out" class="action-button">Opt Out</button>
+      <div id="stats">
+        <span id="roi-day">Daily ROI: 5.2%</span>
+        <span id="roi-month">Monthly ROI: m%</span>
+        <span id="roi-all-time">All Time ROI: x%</span>
+      </div>
+    </div>
+    <div id="graph-container">
+      <!-- Graph will be inserted here -->
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+
+</html>
