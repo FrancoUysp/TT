@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
- <meta charset="UTF-8">
+  <meta charset="UTF-8">
   <title>Trollope Trading - Finance Dashboard</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -13,19 +13,14 @@
     <h1 id="title">Trollope Trading</h1>
   </header>
   <div id="container">
-
     <div id="controls">
       <select id="model-dropdown" class="dropdown">
         <!-- Dynamically populated model options -->
       </select>
       <div id="params-container">
-        <div class="param">
-          <label for="param1">Param 1:</label>
-          <input type="text" id="param1" name="param1">
-        </div>
-        <!-- Add more parameters here if needed -->
-        <button id="set-params" class="action-button">Set</button>
+        <!-- Parameters will be dynamically inserted here by JavaScript -->
       </div>
+      <!-- <button id="add-params" class="action-button">Add</button> -->
       <button id="sell-all" class="action-button">Sell All</button>
       <button id="opt-out" class="action-button">Opt Out</button>
       <div id="stats">

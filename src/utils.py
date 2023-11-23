@@ -1,11 +1,11 @@
 import pandas as pd
-import os 
+# import os 
 # import MetaTrader5 as mt5
-import numpy as np
-from datetime import datetime as dt, timedelta
-import time
+# import numpy as np
+# from datetime import datetime as dt, timedelta
+# import time
 
-BUFFER_SIZE = 180 
+# BUFFER_SIZE = 180 
 
 def read_df(file_loc, n=None):
     "Used to read main.csv etc"
@@ -72,11 +72,11 @@ def read_df(file_loc, n=None):
 #     mt5.shutdown()
 #     print("Main.csv updated successfully!")
 
-def create_buffer_queue():
-    file = os.path.join("..", "data", "main.csv")
-    main_df = read_df(file)
-    buffer_df = main_df.tail(BUFFER_SIZE)
-    return buffer_df
+# def create_buffer_queue():
+#     file = os.path.join("..", "data", "main.csv")
+#     main_df = read_df(file)
+#     buffer_df = main_df.tail(BUFFER_SIZE)
+#     return buffer_df
 
 # def append_to_buffer_and_update_main(buffer_df):
 #     file = os.path.join("..", "data", "main.csv")
@@ -128,10 +128,10 @@ def create_buffer_queue():
 #     mt5.shutdown()
 #     return buffer_df
 
-if __name__ == "__main__":
-    # update_main()
-    buffer_df = create_buffer_queue()
+# if __name__ == "__main__":
+#     update_main()
+#     buffer_df = create_buffer_queue()
 
-    # while True:
-    #     buffer_df = append_to_buffer_and_update_main(buffer_df)
-    #     time.sleep(5)  # waits for 5 seconds before calling the function again
+#     while True:
+#         buffer_df = append_to_buffer_and_update_main(buffer_df)
+#         time.sleep(5)  # waits for 5 seconds before calling the function again

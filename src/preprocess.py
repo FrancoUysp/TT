@@ -1,10 +1,10 @@
 import numpy as np
+from pandas.io.xml import preprocess_data
 from sklearn.decomposition import PCA
 from sklearn.decomposition import FastICA
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
 import ta
-from tqdm import tqdm
 import warnings
 import plotly.graph_objects as go
 import os
@@ -17,160 +17,89 @@ DATA_PATH = os.path.join('..', 'data', 'main.csv')
 TOL = 1
 
 class DataPreprocessor:
-    def __init__(self, input_data= DATA_PATH):
-        if isinstance(input_data, str):  
-            self.data = read_df(input_data)  
-        elif isinstance(input_data, pd.DataFrame):  
-            self.data = input_data
+    def __init__(self, path = DATA_PATH, n = 50000):
+        if isinstance(path, str):
+            self.data = read_df(path, n)
+        elif isinstance(path, pd.DataFrame):
+            self.data = path 
         else:
-            raise ValueError("Invalid input. Please provide a file path or a DataFrame.")
-    
-    def plot_candlestick_with_signals(self, output_file=None):
-        fig = go.Figure()
+            raise TypeError("path_or_df must be a string or a pandas DataFrame")
 
-        fig.add_trace(go.Candlestick(x=self.data.index,
-                open=self.data['open'],
-                high=self.data['high'],
-                low=self.data['low'],
-                close=self.data['close'],
-                name='Candlesticks'))
+    def label_target_wave(self, data):
+        highs = data['high'].values
+        lows = data['low'].values
+        prices = data['close'].values
+        labels = [0] * len(data)
 
-        buy_signals = self.data[self.data['target'] == 1]
-        sell_signals = self.data[self.data['target'] == -1]
+        wait_count_for_long = 0
+        wait_count_for_short = 0
+        short_exit_timer = 0
+        long_exit_timer = 0
+        LOOKBACK = 180
+        LONG_TIMER = SHORT_EXIT = 1
+        SHORT_TIMER = LONG_EXIT = 1
+        LONG_DIFF = 40
+        SHORT_DIFF = 20
 
-        fig.add_trace(go.Scatter(x=buy_signals.index, y=buy_signals['close'],
-                                 mode='markers', name='Buy Signals',
-                                 marker=dict(color='green', size=10, symbol='triangle-up')))
+        ongoing_trade = None
 
-        fig.add_trace(go.Scatter(x=sell_signals.index, y=sell_signals['close'],
-                                 mode='markers', name='Sell Signals',
-                                 marker=dict(color='red', size=10, symbol='triangle-down')))
+        for i in range(LOOKBACK, len(data)):
+            high_window = highs[i-LOOKBACK:i]
+            low_window = lows[i-LOOKBACK:i]
+            current_high = highs[i]
+            current_low = lows[i]
+            current_price = prices[i]
 
-        fig.update_layout(
-            title='Candlestick Chart with Buy/Sell Signals',
-            xaxis_title='Date',
-            yaxis_title='Price',
-            template='plotly_dark',
-            xaxis_rangeslider_visible=False
-        )
+            previous_high = max(high_window)
+            previous_low = min(low_window)
 
-        if output_file:
-            fig.write_html(output_file)  
-        else:
-            fig.show()  
+            # SHORT logic
+            if current_high > previous_high and (current_high - previous_low) > SHORT_DIFF:
+                wait_count_for_short = SHORT_TIMER
+            elif wait_count_for_short > 0:
+                wait_count_for_short -= 1
+                if wait_count_for_short == 0 and not ongoing_trade:
+                    ongoing_trade = {"idx": i, "type": "short", "entry_price": current_price}
 
-    def add_time_features(self):
-        self.data['Year'] = self.data['datetime'].dt.year
-        self.data['Month'] = self.data['datetime'].dt.month
-        self.data['Day'] = self.data['datetime'].dt.day
-        self.data['Hour'] = self.data['datetime'].dt.hour
-        self.data['Minute'] = self.data['datetime'].dt.minute
-        self.data['Day_of_Week'] = self.data['datetime'].dt.dayofweek
-        self.data['Day_Sin'] = np.sin((self.data['Day'] - 1) * (2. * np.pi / 30))
-        self.data['Day_Cos'] = np.cos((self.data['Day'] - 1) * (2. * np.pi / 30))
-        self.data['Hour_Sin'] = np.sin(self.data['Hour'] * (2. * np.pi / 24))
-        self.data['Hour_Cos'] = np.cos(self.data['Hour'] * (2. * np.pi / 24))
-        self.data['Minute_Sin'] = np.sin(self.data['Minute'] * (2. * np.pi / 60))
-        self.data['Minute_Cos'] = np.cos(self.data['Minute'] * (2. * np.pi / 60))
+            # Exit condition for short trade
+            if ongoing_trade and ongoing_trade["type"] == "short":
+                if current_low < previous_low:
+                    short_exit_timer = SHORT_EXIT
+                if short_exit_timer > 0:
+                    short_exit_timer -= 1
+                    if short_exit_timer == 0:
+                        profit_pct = (ongoing_trade["entry_price"] - current_price) / ongoing_trade["entry_price"]
+                        label = 3 if profit_pct >= 0.00 else 2
+                        for j in range(ongoing_trade["idx"], i):
+                            labels[j] = label
+                        ongoing_trade = None
 
-    def add_technical_indicators(self):
-        self.data['SMA_10'] = ta.trend.sma_indicator(self.data['close'], window=10)
-        self.data['EMA_10'] = ta.trend.ema_indicator(self.data['close'], window=10)
-        self.data['RSI'] = ta.momentum.RSIIndicator(self.data['close'], window=14).rsi()
+            if current_low < previous_low and (previous_high - current_low) > LONG_DIFF:
+                wait_count_for_long = LONG_TIMER
+            elif wait_count_for_long > 0:
+                wait_count_for_long -= 1
+                if wait_count_for_long == 0 and not ongoing_trade:
+                    ongoing_trade = {"idx": i, "type": "long", "entry_price": current_price}
 
-        macd = ta.trend.MACD(self.data['close'])
-        self.data['MACD'] = macd.macd()
-        self.data['MACD_signal'] = macd.macd_signal()
-        self.data['MACD_diff'] = macd.macd_diff()
+            if ongoing_trade and ongoing_trade["type"] == "long":
+                if current_high > previous_high:
+                    long_exit_timer = LONG_EXIT
+                if long_exit_timer > 0:
+                    long_exit_timer -= 1
+                    if long_exit_timer == 0:
+                        profit_pct = (current_price - ongoing_trade["entry_price"]) / ongoing_trade["entry_price"]
+                        label = 1 if profit_pct >= 0.00 else 0
+                       
+                        for j in range(ongoing_trade["idx"], i):
+                            labels[j] = label
+                        ongoing_trade = None
 
-        stoch = ta.momentum.StochasticOscillator(self.data['high'], self.data['low'], self.data['close'])
-        self.data['Stoch_%K'] = stoch.stoch()
-        self.data['Stoch_%D'] = stoch.stoch_signal()
+        data['target'] = labels
+        return data
 
-        self.data['ATR'] = ta.volatility.AverageTrueRange(self.data['high'], self.data['low'], self.data['close']).average_true_range()
+    def label_strong_target(self, data, window_size=30, price_diff_threshold=20, tolerance=1, pred = False):
 
-        bollinger = ta.volatility.BollingerBands(self.data['close'])
-        self.data['Bollinger_hband'] = bollinger.bollinger_hband()
-        self.data['Bollinger_lband'] = bollinger.bollinger_lband()
-        self.data['Bollinger_mavg'] = bollinger.bollinger_mavg()
-
-        self.data['ROC'] = ta.momentum.ROCIndicator(self.data['close']).roc()
-        self.data['PPO'] = ta.momentum.PercentagePriceOscillator(self.data['close']).ppo()
-
-        self.data['Ichimoku_Conversion'] = (self.data['high'].rolling(window=9).max() + self.data['low'].rolling(window=9).min()) / 2
-        self.data['Ichimoku_Base'] = (self.data['high'].rolling(window=26).max() + self.data['low'].rolling(window=26).min()) / 2
-        self.data['Ichimoku_Leading_A'] = (self.data['Ichimoku_Conversion'] + self.data['Ichimoku_Base']) / 2
-        self.data['Ichimoku_Leading_B'] = (self.data['high'].rolling(window=52).max() + self.data['low'].rolling(window=52).min()) / 2
-        self.data['Ichimoku_Lagging'] = self.data['close'].shift(26)
-        
-        self.data['Pct_Change_1min'] = self.data['close'].pct_change(1)
-        self.data['Pct_Change_5min'] = self.data['close'].pct_change(5)
-        self.data['Pct_Change_10min'] = self.data['close'].pct_change(10)
-        self.data['Pct_Change_30min'] = self.data['close'].pct_change(30)
-
-        self.data['ATRP'] = ta.volatility.AverageTrueRange(self.data['high'], self.data['low'], self.data['close']).average_true_range()
-
-        self.data['Historical_Volatility'] = self.data['close'].rolling(window=10).std() * (252**0.5)  
-        self.data['Price_Oscillator'] = self.data['close'].diff(4)  
-        self.data['Standard_Deviation'] = self.data['close'].rolling(window=14).std()
-
-        self.data['CCI'] = ta.trend.CCIIndicator(self.data['high'], self.data['low'], self.data['close']).cci()
-
-        donchian = ta.volatility.DonchianChannel(self.data['high'], self.data['low'], self.data['close'])
-        self.data['Donchian_Channel_hband'] = donchian.donchian_channel_hband()
-        self.data['Donchian_Channel_lband'] = donchian.donchian_channel_lband()
-        self.data['Donchian_Channel_mband'] = donchian.donchian_channel_mband()
-
-        kst = ta.trend.KSTIndicator(self.data['close'])
-        self.data['KST'] = kst.kst()
-        self.data['KST_Signal'] = kst.kst_sig()
-
-        self.data['TRIX'] = ta.trend.TRIXIndicator(self.data['close']).trix()
-
-
-        self.data.drop(columns=['datetime'], inplace=True)
-
-
-    def handle_missing_values(self):
-        self.data.dropna(axis=0, inplace=True)
-
-    def transform_for_pred(self, data):
-        self.data = data
-        self.add_time_features()
-        self.add_technical_indicators()
-        self.data = self.analyze_sharp_changes(self.data, pred=True)
-        self.handle_missing_values()
-        return self.data
-
-    def analyze_sharp_changes(self, data, window_size=30, price_diff_threshold=20, tolerance=1, pred = False):
-
-
-        # rolling_min = data['close'].rolling(window_size).min()
-        # rolling_max = data['close'].rolling(window_size).max()
-        # 
-        # price_diff = rolling_max - rolling_min
-        # sharp_changes_idx = np.where(price_diff >= price_diff_threshold)[0]
-        # sharp_changes_idx = sharp_changes_idx[sharp_changes_idx < len(data) - window_size + 1]
-        # sharp_changes_info = []
-        # for idx in sharp_changes_idx:
-        #     min_price = rolling_min.iloc[idx]
-        #     max_price = rolling_max.iloc[idx]
-        #     actual_price = data['close'].iloc[idx]
-        #     if np.abs(actual_price - min_price) > np.abs(max_price - actual_price):
-        #         change_start_price = min_price
-        #         change_magnitude = actual_price - min_price
-        #     else:
-        #         change_start_price = max_price
-        #         change_magnitude = max_price - actual_price
-        #     
-        #     if not any(np.abs(change_start_price - prev_price) < window_size for prev_price, _ in sharp_changes_info):
-        #         sharp_changes_info.append((change_start_price, change_magnitude))
-        # 
-        # # Sort the changes by magnitude in descending order, extract the prices, and then sort by price
-        # lines = sorted([price for price, _ in sorted(sharp_changes_info, key=lambda x: x[1], reverse=True)])
-        # data = data[data['close'] >= (10000 - 20)]
-
-        rs_lines = pd.read_csv("../data/stronglines.csv")
+        rs_lines = pd.read_csv("data/stronglines.csv")
         lines = rs_lines.values.flatten()
 
         close_prices = data['close'].values[:, np.newaxis]
@@ -207,16 +136,106 @@ class DataPreprocessor:
             data['target'] = np.where(diffs > 0, 1, np.where(diffs < 0, -1, 0))
 
         return data 
+
+    def add_time_features(self):
+        self.data['Day'] = self.data['datetime'].dt.day
+        self.data['Hour'] = self.data['datetime'].dt.hour
+        self.data['Minute'] = self.data['datetime'].dt.minute
+        self.data['Day_of_Week'] = self.data['datetime'].dt.dayofweek
+        self.data['Day_Sin'] = np.sin((self.data['Day'] - 1) * (2. * np.pi / 30))
+        self.data['Day_Cos'] = np.cos((self.data['Day'] - 1) * (2. * np.pi / 30))
+        self.data['Hour_Sin'] = np.sin(self.data['Hour'] * (2. * np.pi / 24))
+        self.data['Hour_Cos'] = np.cos(self.data['Hour'] * (2. * np.pi / 24))
+        self.data['Minute_Sin'] = np.sin(self.data['Minute'] * (2. * np.pi / 60))
+        self.data['Minute_Cos'] = np.cos(self.data['Minute'] * (2. * np.pi / 60))
+
+    def add_technical_indicators(self):
+        windows = {
+            "long": 180,
+            "medium": 180 // 2,
+            "short": 180 // 6
+        }
+
+        for name, size in windows.items():
+            # SMA, EMA, RSI
+            self.data[f'SMA_{name}'] = ta.trend.sma_indicator(self.data['close'], window=size)
+            self.data[f'EMA_{name}'] = ta.trend.ema_indicator(self.data['close'], window=size)
+            self.data[f'RSI_{name}'] = ta.momentum.RSIIndicator(self.data['close'], window=size).rsi()
+
+            # MACD (only for the default values as it uses multiple windows)
+            if name == "medium":
+                macd = ta.trend.MACD(self.data['close'])
+                self.data['MACD'] = macd.macd()
+                self.data['MACD_signal'] = macd.macd_signal()
+                self.data['MACD_diff'] = macd.macd_diff()
+
+            # Stochastic Oscillator
+            stoch = ta.momentum.StochasticOscillator(self.data['high'], self.data['low'], self.data['close'], window=size)
+            self.data[f'Stoch_%K_{name}'] = stoch.stoch()
+            self.data[f'Stoch_%D_{name}'] = stoch.stoch_signal()
+
+            # Donchian
+            donchian = ta.volatility.DonchianChannel(self.data['high'], self.data['low'], self.data['close'], window=size)
+            self.data[f'Donchian_{name}_hband'] = donchian.donchian_channel_hband()
+            self.data[f'Donchian_{name}_lband'] = donchian.donchian_channel_lband()
+            self.data[f'Donchian_{name}_mband'] = donchian.donchian_channel_mband()
+
+            # Bollinger Bands
+            bollinger = ta.volatility.BollingerBands(self.data['close'], window=size)
+            self.data[f'Bollinger_{name}_hband'] = bollinger.bollinger_hband()
+            self.data[f'Bollinger_{name}_lband'] = bollinger.bollinger_lband()
+            self.data[f'Bollinger_{name}_mavg'] = bollinger.bollinger_mavg()
+
+            # Percentage Change
+            self.data[f'Pct_Change_{name}'] = self.data['close'].pct_change(size)
+
+            # Historical Volatility
+            self.data[f'Historical_Volatility_{name}'] = self.data['close'].rolling(window=size).std() * (252**0.5)
+
+            # CCI
+            self.data[f'CCI_{name}'] = ta.trend.CCIIndicator(self.data['high'], self.data['low'], self.data['close'], window=size).cci()
+
+            # Standard Deviation
+            self.data[f'Standard_Deviation_{name}'] = self.data['close'].rolling(window=size).std()
+
+            # TRIX
+            self.data[f'TRIX_{name}'] = ta.trend.TRIXIndicator(self.data['close'], window=size).trix()
+
+        self.data['Parabolic_SAR'] = ta.trend.PSARIndicator(self.data['high'], self.data['low'], self.data['close']).psar()
+        self.data['ATR'] = ta.volatility.AverageTrueRange(self.data['high'], self.data['low'], self.data['close']).average_true_range()
+        self.data['ROC'] = ta.momentum.ROCIndicator(self.data['close']).roc()
+        self.data['PPO'] = ta.momentum.PercentagePriceOscillator(self.data['close']).ppo()
+
+        self.data['Ichimoku_Conversion'] = (self.data['high'].rolling(window=9).max() + self.data['low'].rolling(window=9).min()) / 2
+        self.data['Ichimoku_Base'] = (self.data['high'].rolling(window=26).max() + self.data['low'].rolling(window=26).min()) / 2
+        self.data['Ichimoku_Leading_A'] = (self.data['Ichimoku_Conversion'] + self.data['Ichimoku_Base']) / 2
+        self.data['Ichimoku_Leading_B'] = (self.data['high'].rolling(window=52).max() + self.data['low'].rolling(window=52).min()) / 2
+        self.data['Ichimoku_Lagging'] = self.data['close'].shift(26)
+
+        self.data['ATRP'] = ta.volatility.AverageTrueRange(self.data['high'], self.data['low'], self.data['close']).average_true_range()
+        self.data['Price_Oscillator'] = self.data['close'].diff(4)
+
+        self.data.drop(columns=['datetime'], inplace=True)
+
+
+    def handle_missing_values(self):
+        self.data = self.data.dropna()
+
             
-    def transform_for_training(self, n = None):
-        self.data = self.analyze_sharp_changes(self.data)
-        self.add_time_features()
-        self.add_summaries()
-        self.add_technical_indicators()
-        self.handle_missing_values()
+    def transform_for_pred(self, data):
+        preprocessor = DataPreprocessor(path=data)
+        preprocessor.add_time_features()
+        preprocessor.add_technical_indicators()
+        preprocessor.data = preprocessor.label_strong_target(preprocessor.data, pred = True)
+        preprocessor.handle_missing_values()
         return self.data
 
-if __name__ == "__main__":
-    preprocessor = DataPreprocessor()
-    preprocessor.transform_for_training(n=45000)
-    preprocessor.plot_candlestick_with_signals()
+    def transform_for_train(self, data):
+        preprocessor = DataPreprocessor(path=data)
+        preprocessor.add_time_features()
+        preprocessor.add_technical_indicators()
+        preprocessor.data = preprocessor.label_target_wave(preprocessor.data)
+        preprocessor.data = preprocessor.label_strong_target(preprocessor.data, pred = True)
+        preprocessor.handle_missing_values()
+        return self.data
+

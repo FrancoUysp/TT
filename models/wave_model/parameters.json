@@ -1,0 +1,25 @@
+{
+  "strategy_params": {
+    "LOOKBACK": 180,
+    "LONG_TIMER": 1,
+    "SHORT_EXIT": 1,
+    "SHORT_TIMER": 1,
+    "LONG_EXIT": 1,
+    "LONG_DIFF": 40,
+    "SHORT_DIFF": 20
+  },
+  "model_long_params": {
+    "objective": "binary:logistic",
+    "eval_metric": "auc",
+    "learning_rate": 0.01,
+    "scale_pos_weight": 1,
+    "probability_threshold": 0.7
+  },
+  "model_short_params": {
+    "objective": "binary:logistic",
+    "eval_metric": "auc",
+    "learning_rate": 0.01,
+    "scale_pos_weight": 1,
+    "probability_threshold": 0.7
+  }
+}

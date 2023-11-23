@@ -58,19 +58,39 @@ body {
 }
 
 .param {
-    margin-bottom: 10px; /* Space out the parameters */
+    display: flex; /* Enable flexbox for direct children */
+    align-items: center; /* Align label and input on the cross axis */
+    margin-bottom: 5px; /* Reduce space between each parameter div */
 }
 
-.param input, .dropdown {
-    width: 100%; /* Make inputs and dropdown take full width */
+.param label {
+    flex: 0 0 40%; /* Label width, not growing or shrinking */
+    margin-right: 10px; /* Space between label and input */
+}
+
+#params-container .param input.invalid-input {
+  border: 1px solid #ff4136; /* Red border for invalid input */
+  /* background-color: #ffcccc;  */
+}
+
+.param input {
+    flex: 1; /* Input will fill up the remaining space */
     padding: 8px;
-    margin-top: 5px; /* Space above the input field */
-    border: 1px solid #555; /* Add border to inputs for definition */
+    border: 1px solid #555;
     background-color: #222;
     color: #fff;
     border-radius: 3px;
 }
 
+.dropdown {
+    /* flex: 1; */
+    padding: 8px;
+    margin-top: 5px;
+    border: 1px solid #555;
+    background-color: #222;
+    color: #fff;
+    border-radius: 3px;
+}
 .action-button {
     padding: 12px 20px;
     margin: 10px 0;
