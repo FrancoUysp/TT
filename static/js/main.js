@@ -1,260 +1,285 @@
 document.addEventListener('DOMContentLoaded', function() {
-  fetchModelsAndParams();
-  setInterval(updateUI, 2000);
+  initializeUI();
 });
 
-function updateUI() {
+function initializeUI() {
+  fetchAndDisplayCandlestickData();
+  fetchAndDisplayModels();
 
-  // Fetch and update ROI values
-  fetch('/get_roi_day').then(response => response.json()).then(data => {
-    document.getElementById('roi-day').innerText = `Daily ROI: ${data.daily_roi}`;
-  });
+  setInterval(() => {
+    fetchAndDisplayCandlestickData();
+  }, 2000);
 
+  document.getElementById('add-params').addEventListener('click', handleAddModelClick);
+  document.getElementById('update-params').addEventListener('click', handleUpdateClick);
+  document.getElementById('delete-model').addEventListener('click', handleDeleteClick);
+  document.getElementById('sell-all').addEventListener('click', handleSellAllClick);
+  document.getElementById('opt-out').addEventListener('click', handleOptOutClick);
+}
+
+function fetchAndDisplayCandlestickData() {
   fetch('/get_data').then(response => response.json()).then(data => {
-    const trace = {
-      x: data.map(row => {
-        let date = new Date(row.datetime);
-        return date.toISOString();
-      }),
-      close: data.map(row => row.close),
-      decreasing: { line: { color: 'red' } },
-      high: data.map(row => row.high),
-      increasing: { line: { color: 'green' } },
-      low: data.map(row => row.low),
-      open: data.map(row => row.open),
-      type: 'candlestick',
-      xaxis: 'x',
-      yaxis: 'y'
-    };
-
-    const layout = {
-      title: 'Candlestick Chart',
-      autosize: true, // This will cause the plot to resize to the container
-      height: window.innerHeight - document.getElementById('title-container').offsetHeight - 20, // Adjust the height dynamically
-      xaxis: {
-        title: 'Time',
-        rangeslider: { visible: false },
-        gridcolor: 'rgba(255, 255, 255, 0.1)',
-        tickformat: '%H:%M:%S', // This will ensure only the time is shown
-        tickangle: -45, // Tilt the labels to prevent overlap
-        automargin: true, // Automatically adjust margins to fit labels
-        title: {
-          text: 'Time',
-          font: {
-            color: '#ffffff'
-          }
-        }
-      },
-      yaxis: {
-        gridcolor: 'rgba(255, 255, 255, 0.1)',
-        title: 'Price'
-      },
-      paper_bgcolor: 'rgba(0,0,0,0)',
-      plot_bgcolor: 'rgba(0,0,0,0)',
-      font: {
-        color: '#ffffff'
-      }
-    };
-
-    Plotly.newPlot('graph-container', [trace], layout);
-
+    plotCandlestickChart(data);
   });
-
 }
-function fetchModelsAndParams() {
+
+function plotCandlestickChart(data) {
+  const trace = {
+    x: data.map(row => new Date(row.datetime).toISOString()),
+    close: data.map(row => row.close),
+    decreasing: { line: { color: '#ff4136' } },
+    high: data.map(row => row.high),
+    increasing: { line: { color: '#2ecc40' } },
+    low: data.map(row => row.low),
+    open: data.map(row => row.open),
+    type: 'candlestick',
+    xaxis: 'x',
+    yaxis: 'y'
+  };
+
+  const layout = {
+    title: 'Candlestick Chart',
+    autosize: true,
+    height: window.innerHeight - document.getElementById('title-container').offsetHeight - 20,
+    xaxis: {
+      autorange: true,
+      title: 'Time',
+      rangeslider: { visible: false },
+      tickformat: '%H:%M:%S',
+      tickangle: -45,
+      automargin: true,
+      gridcolor: 'rgba(255, 255, 255, 0.1)'
+    },
+    yaxis: {
+      autorange: true,
+      title: 'Price',
+      gridcolor: 'rgba(255, 255, 255, 0.1)'
+    },
+    paper_bgcolor: '#000',
+    plot_bgcolor: '#000',
+    font: {
+      color: '#ffffff'
+    }
+  };
+
+  Plotly.newPlot('graph-container', [trace], layout);
+}
+
+function fetchAndDisplayModels() {
   fetch('/get_models').then(response => response.json()).then(modelsInfo => {
-    console.log("Received models info:", modelsInfo); // Debug: log the received modelsInfo
-
-    const modelDropdown = document.getElementById('model-dropdown');
-    const paramsContainer = document.getElementById('params-container');
-
-    modelDropdown.innerHTML = '';
-    paramsContainer.innerHTML = '';
-
-    modelsInfo.forEach(modelInfo => {
-      console.log("Processing model:", modelInfo.name); // Debug: log the current model being processed
-
-      let option = new Option(modelInfo.name, modelInfo.name);
-      modelDropdown.add(option);
-
-      let paramsSection = document.createElement('section');
-      paramsSection.id = `${modelInfo.name}-params`;
-      paramsSection.style.display = 'none';
-
-      for (const [paramName, paramDetails] of Object.entries(modelInfo.params)) {
-        console.log(`Processing param: ${paramName}`, paramDetails); // Shows the details of param
-
-        if (paramDetails instanceof Object) {
-          for (const [detailName, detailValue] of Object.entries(paramDetails)) {
-            let paramDiv = document.createElement('div');
-            paramDiv.className = 'param';
-            paramDiv.style.display = 'flex'; // Use flexbox for layout
-            paramDiv.style.justifyContent = 'space-between'; // Space between label and input
-            paramDiv.style.alignItems = 'center'; // Align items vertically
-            paramDiv.style.marginBottom = '5px'; // Reduced space between items
-
-            let label = document.createElement('label');
-            label.setAttribute('for', `${modelInfo.name}-${paramName}-${detailName}`);
-            label.innerText = `${detailName}:`;
-            label.style.flexBasis = '40%'; // Label takes up 40% of the div
-
-            let input = document.createElement('input');
-            input.type = 'text';
-            input.id = `${modelInfo.name}-${paramName}-${detailName}`;
-            input.name = `${modelInfo.name}-${paramName}-${detailName}`;
-            input.value = detailValue;
-            input.style.flexBasis = '60%'; // Input takes up 60% of the div
-
-            paramDiv.appendChild(label);
-            paramDiv.appendChild(input);
-            paramsSection.appendChild(paramDiv);
-          }
-        } else {
-          // If paramDetails is not an object, handle as a primitive value
-          let paramDiv = document.createElement('div');
-          paramDiv.className = 'param';
-
-          let label = document.createElement('label');
-          label.setAttribute('for', `${modelInfo.name}-${paramName}`);
-          label.innerText = `${paramName}:`;
-
-          let input = document.createElement('input');
-          input.type = 'text';
-          input.id = `${modelInfo.name}-${paramName}`;
-          input.name = `${modelInfo.name}-${paramName}`;
-          input.value = paramDetails;
-
-          paramDiv.appendChild(label);
-          paramDiv.appendChild(input);
-          paramsSection.appendChild(paramDiv);
-        }
-      }
-
-      paramsContainer.appendChild(paramsSection);
-    });
-
-    modelDropdown.addEventListener('change', function() {
-      document.querySelectorAll('#params-container > section').forEach(section => {
-        section.style.display = 'none';
-      });
-      let selectedModel = this.value;
-      document.getElementById(`${selectedModel}-params`).style.display = 'block';
-    });
-
-    modelDropdown.dispatchEvent(new Event('change'));
-
-    let addButton = document.getElementById('add-params');
-    if (!addButton) {
-      // 'Set' button does not exist, create it.
-      addButton = document.createElement('button');
-      addButton.id = 'add-params';
-      addButton.className = 'action-button';
-      addButton.innerText = 'Add';
-      addButton.addEventListener('click', setModelParams); // Ensure the event listener is added
-      paramsContainer.appendChild(addButton);
-    } else {
-      // 'Set' button exists, update the event listener if necessary
-      addButton.removeEventListener('click', setModelParams); // Remove the old event listener
-      addButton.addEventListener('click', setModelParams); // Add the new event listener
-    }
+    populateDropdown('model-dropdown', modelsInfo, 'params-container');
+    fetchActiveModels(); // Fetch active models for the right panel
   });
-
 }
 
-function setModelParams() {
-  let allValid = true; // Flag to track validation status
-  const params = {};
+function populateDropdown(dropdownId, models, paramsContainerId) {
+  const dropdown = document.getElementById(dropdownId);
+  dropdown.innerHTML = '';
 
-  console.log("Setting parameters...");
-
-  // Iterate through each parameter input and validate
-  document.querySelectorAll('#params-container .param input').forEach(input => {
-    const name = input.name;
-    const value = input.value.trim();
-
-    console.log(`Validating param: ${name}, Value: ${value}`);
-
-    // Remove previous invalid class if any
-    input.classList.remove('invalid-input');
-
-    // Check if the value is a number and non-negative
-    if (!isNaN(value) && Number(value) >= 0) {
-      params[name] = Number(value);
-    } else {
-      // Add invalid input class and set the flag to false
-      input.classList.add('invalid-input');
-      console.log(`Invalid param: ${name}`);
-      allValid = false;
-    }
+  models.forEach(modelInfo => {
+    let option = document.createElement('option');
+    option.text = modelInfo.name;
+    option.value = modelInfo.name;
+    dropdown.add(option);
   });
 
-  if (!allValid) {
-    alert('Some parameters are invalid. Please correct them.');
-    return; // Exit the function if there are any invalid params
+  if (models.length > 0) {
+    populateParameters(models[0], paramsContainerId);
   }
 
-  // Confirm with the user
-  if (confirm('Are you sure you want to set these parameters?')) {
-    // Make a POST request to set the parameters
-    fetch('/set_params', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(params)
-    })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          alert(data.message);
-        } else {
-          alert('There was an error setting the parameters.');
-        }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        alert('Failed to set parameters.');
-      });
+  // Add change event listener to update parameters when a new model is selected
+  dropdown.onchange = function() {
+    let selectedModel = models.find(model => model.name === this.value);
+    if (selectedModel) {
+      populateParameters(selectedModel, paramsContainerId);
+    }
+  };
+}
+
+function populateParameters(modelInfo, containerId) {
+  const paramsContainer = document.getElementById(containerId);
+  paramsContainer.innerHTML = '';
+
+  for (const paramName in modelInfo.params) {
+    let paramDiv = document.createElement('div');
+    paramDiv.className = 'param';
+
+    let label = document.createElement('label');
+    label.innerText = `${paramName}:`;
+    let input = document.createElement('input');
+    input.type = 'text';
+    input.value = modelInfo.params[paramName];
+
+    paramDiv.appendChild(label);
+    paramDiv.appendChild(input);
+    paramsContainer.appendChild(paramDiv);
   }
 }
 
-function addModelParams() {
+function collectParams(containerId, isUpdate = false) {
   const params = {};
+  const container = document.getElementById(containerId);
+  const inputs = container.getElementsByTagName('input');
+  let dropdown = document.getElementById('model-dropdown');
   let allValid = true;
 
-  // Collect all the parameters from the input fields
-  document.querySelectorAll('#params-container .param input').forEach(input => {
-    const name = input.name;
-    const value = input.value.trim();
-    if (!isNaN(value) && Number(value) >= 0) {
-      params[name] = Number(value);
-    } else {
-      allValid = false;
-    }
-  });
+  // If it's an update, we need to get the old name from the dropdown
+  if (isUpdate) {
+    let oldNameDropdown = document.getElementById('ava-model-dropdown');
+    params['old_name'] = oldNameDropdown.options[oldNameDropdown.selectedIndex].value;
+    dropdown = document.getElementById('ava-model-dropdown'); // Switch to the active models dropdown
+  }
 
-  // If all parameters are valid, send them to the server
+  for (let input of inputs) {
+    const paramName = input.previousElementSibling.innerText.slice(0, -1);
+    const value = input.value.trim();
+
+    // If the parameter is 'name', allow it to be non-numeric
+    if (paramName.toLowerCase() === 'name') {
+      params[paramName] = value;
+    } else if (isNaN(value) || Number(value) < 0) {
+      input.classList.add('invalid-input');
+      allValid = false;
+    } else {
+      input.classList.remove('invalid-input');
+      params[paramName] = Number(value);
+    }
+  }
+
   if (allValid) {
-    fetch('/add_model', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(params)
-    })
+    // For adding a new model, get the model name from the dropdown
+    if (!isUpdate) {
+      params['name'] = dropdown.options[dropdown.selectedIndex].value;
+    }
+    return params;
+  } else {
+    alert('Some parameters are invalid. Please correct them.');
+    return null;
+  }
+}
+
+function handleAddModelClick() {
+  const params = collectParams('params-container');
+  if (params) {
+    addModel(params);
+  }
+}
+
+function addModel(params) {
+  fetch('/add_model', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params)
+  }).then(response => response.json()).then(data => {
+    if (data.success) {
+      alert('Model added successfully.');
+      fetchAndDisplayModels(); // Fetch and display the models again, including the new one
+    } else {
+      alert('Error: ' + data.message);
+    }
+  }).catch(error => {
+    console.error('Error adding model:', error);
+    alert('Failed to add the model due to an error.');
+  });
+}
+
+function fetchActiveModels() {
+  fetch('/get_active_models').then(response => response.json()).then(activeModels => {
+    populateDropdown('ava-model-dropdown', activeModels, 'ava-params-container');
+  });
+}
+
+
+function handleUpdateClick() {
+  const params = collectParams('ava-params-container', true);
+  if (params) {
+    updateModel(params);
+  }
+}
+
+function updateModel(params) {
+  fetch('/update_model', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params)
+  }).then(response => response.json()).then(data => {
+    if (data.success) {
+      alert('Model updated successfully.');
+      fetchActiveModels(); // This should update the dropdown
+      updateParametersDisplay(params.name); // Update the parameters display
+    } else {
+      alert('Error: ' + data.message);
+    }
+  }).catch(error => {
+    console.error('Error updating model:', error);
+    alert('Failed to update the model due to an error.');
+  });
+}
+
+function updateParametersDisplay(updatedModelName) {
+  // Fetch the updated model's parameters
+  fetch(`/get_model_params?name=${encodeURIComponent(updatedModelName)}`)
     .then(response => response.json())
     .then(data => {
-      if (data.success) {
-        alert('Model added successfully.');
-      } else {
-        alert('Failed to add the model.');
-      }
+      populateParameters(data, 'ava-params-container'); // Update the parameters display
+      updateDropdownSelection(updatedModelName); // Ensure dropdown is set to the updated model
     })
     .catch(error => {
-      console.error('Error:', error);
-      alert('Failed to add the model.');
+      console.error('Error fetching updated model parameters:', error);
     });
-  } else {
-    alert('Some parameters are invalid. Please correct them before adding the model.');
+}
+
+function updateDropdownSelection(newModelName) {
+  const dropdown = document.getElementById('ava-model-dropdown');
+  for (let i = 0; i < dropdown.options.length; i++) {
+    if (dropdown.options[i].value === newModelName) {
+      dropdown.selectedIndex = i;
+      break;
+    }
   }
+}
+
+function handleDeleteClick() {
+  const modelToDelete = document.getElementById('ava-model-dropdown').value;
+  if (modelToDelete) {
+    deleteModel(modelToDelete);
+  }
+}
+
+function deleteModel(modelName) {
+  fetch('/delete_model', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ name: modelName })
+  }).then(response => response.json()).then(data => {
+    if (data.success) {
+      alert('Model deleted successfully.');
+      fetchActiveModels(); // Refresh the list of active models
+      clearParameters('ava-params-container'); // Clear the parameters display area
+    } else {
+      alert('Error: ' + data.message);
+    }
+  }).catch(error => {
+    console.error('Error deleting model:', error);
+    alert('Failed to delete the model due to an error.');
+  });
+}
+
+function clearParameters(containerId) {
+  const paramsContainer = document.getElementById(containerId);
+  paramsContainer.innerHTML = ''; // Clear the inner HTML, removing parameter fields
+}
+
+function handleSellAllClick() {
+  alert('Sell All functionality not implemented.');
+}
+
+function handleOptOutClick() {
+  alert('Opt Out functionality not implemented.');
 }

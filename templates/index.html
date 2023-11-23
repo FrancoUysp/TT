@@ -1,39 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <title>Trollope Trading - Finance Dashboard</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
-
 <body>
   <header id="title-container">
     <h1 id="title">Trollope Trading</h1>
   </header>
   <div id="container">
     <div id="controls">
-      <select id="model-dropdown" class="dropdown">
-        <!-- Dynamically populated model options -->
-      </select>
-      <div id="params-container">
-        <!-- Parameters will be dynamically inserted here by JavaScript -->
-      </div>
-      <!-- <button id="add-params" class="action-button">Add</button> -->
-      <button id="sell-all" class="action-button">Sell All</button>
-      <button id="opt-out" class="action-button">Opt Out</button>
-      <div id="stats">
-        <span id="roi-day">Daily ROI: 5.2%</span>
-        <span id="roi-month">Monthly ROI: m%</span>
-        <span id="roi-all-time">All Time ROI: x%</span>
-      </div>
+      <h2>New Model</h2>
+      <select id="model-dropdown" class="dropdown"></select>
+      <div id="params-container"></div>
+      <button id="add-params" class="action-button">Add</button>
     </div>
-    <div id="graph-container">
-      <!-- Graph will be inserted here -->
+    <div id="ava-controls">
+      <h2>Active Models</h2>
+      <select id="ava-model-dropdown" class="dropdown"></select>
+      <div id="ava-params-container"></div>
+      <div id="model-actions">
+        <button id="update-params" class="action-button">Update</button>
+        <button id="delete-model" class="action-button">Delete</button>
+        <button id="sell-all" class="action-button">Sell All</button>
+        <button id="opt-out" class="action-button">Opt Out</button>
+      </div>
     </div>
   </div>
+  <div id="graph-container"></div>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
-
 </html>

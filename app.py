@@ -30,15 +30,16 @@ class MainServer():
     def load_models(self):
         models = {}
         return models
+
     def update_data(self):
         global buffer_df
         while True:
             try:
                 with data_lock:
                     buffer_df = append_to_buffer_and_update_main(buffer_df)
-                    if self.models:
-                        for model_name, model in self.models.items():
-                            decision = model.process_new_data(buffer_df)
+                    # if self.models:
+                    #     for model_name, model in self.models.items():
+                    #         decision = model.process_new_data(buffer_df)
 
             except Exception as e:
                 print(f"An error occurred: {e}")
@@ -75,56 +76,71 @@ def get_models():
                 print(f"Error decoding JSON for model {model_name}: {e}")
                 continue
 
-    print(models_info)
+    # print(models_info)
     return jsonify(models_info)
 
 @app.route('/add_model', methods=['POST'])
 def add_model():
-    # Retrieve the model parameters from the request
     model_params = request.json
-    # Logic to add the model goes here
-    print('Received model to add:', model_params)
-    # After adding the model, return success
-    return jsonify({"success": True, "message": "Model added successfully"})
-
-@app.route('/set_params', methods=['POST'])
-def set_params():
-    # Retrieve and set parameters for your model
-    params = request.json
-    print('Received parameters:', params)  # This line will print the parameters to the console
-    # Placeholder for setting parameters
-    # Here you would add your logic to actually set the parameters in your system
+    model_name = model_params.get("name")  # Assuming a 'name' key in your JSON
+    if not model_name:
+        return jsonify({"success": False, "message": "Model name is required"}), 400
     
-    return jsonify({"success": True, "message": "Parameters set"})
-@app.route('/sell_all', methods=['POST'])
-def sell_all():
-    # Implement the logic to sell all
-    # Placeholder response
-    return jsonify({"success": True, "message": "Sold all positions"})
+    with data_lock:
+        if model_name in main_server.models:
+            return jsonify({"success": False, "message": "Model already exists"}), 400
+        else:
+            # Store the model parameters under the model name
+            main_server.models[model_name] = model_params
+            # You might want to create an actual model instance here and store it
+            # instead of just the parameters, depending on your application's requirements
+            return jsonify({"success": True, "message": "Model added successfully"})
 
-@app.route('/opt_out', methods=['POST'])
-def opt_out():
-    # Implement the logic for opting out
-    # Placeholder response
-    return jsonify({"success": True, "message": "Opted out successfully"})
+@app.route('/get_active_models', methods=['GET'])
+def get_active_models():
+    with data_lock:
+        # Return a list of model dictionaries with names and parameters
+        active_models = [{"name": name, "params": params} for name, params in main_server.models.items()]
+        return jsonify(active_models)
 
-@app.route('/get_roi_day', methods=['GET'])
-def get_roi_day():
-    # Placeholder for daily ROI retrieval logic
-    daily_roi = "5.2%"
-    return jsonify({"daily_roi": daily_roi})
+@app.route('/update_model', methods=['POST'])
+def update_model():
+    with data_lock:
+        model_params = request.json
+        old_name = model_params.get("old_name")
+        new_name = model_params.get("name")
 
-@app.route('/get_roi_month', methods=['GET'])
-def get_roi_month():
-    # Placeholder for monthly ROI retrieval logic
-    monthly_roi = "10.4%"
-    return jsonify({"monthly_roi": monthly_roi})
+        if old_name in main_server.models:
+            if new_name != old_name:
+                if new_name not in main_server.models:
+                    main_server.models.pop(old_name)
+                    main_server.models[new_name] = model_params
+                    main_server.models[new_name]['name'] = new_name
+                else:
+                    return jsonify({"success": False, "message": "New model name already exists"}), 400
+            else:
+                main_server.models[old_name] = model_params
+                main_server.models[old_name]['name'] = old_name
 
-@app.route('/get_roi_all_time', methods=['GET'])
-def get_roi_all_time():
-    # Placeholder for all-time ROI retrieval logic
-    all_time_roi = "150%"
-    return jsonify({"all_time_roi": all_time_roi})
+            if 'old_name' in model_params:
+                del model_params['old_name']
+
+            print(main_server.models)
+            return jsonify({"success": True, "message": "Model updated successfully"})
+
+        else:
+            return jsonify({"success": False, "message": "Old model not found"}), 404
+
+@app.route('/delete_model', methods=['POST'])
+def delete_model():
+    with data_lock:
+        model_name = request.json.get("name")
+        if model_name and model_name in main_server.models:
+            # Delete the model
+            del main_server.models[model_name]
+            return jsonify({"success": True, "message": "Model deleted successfully"})
+        else:
+            return jsonify({"success": False, "message": "Model not found"}), 404
 
 @app.route('/')
 def index():
