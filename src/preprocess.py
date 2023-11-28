@@ -17,13 +17,8 @@ DATA_PATH = os.path.join('..', 'data', 'main.csv')
 TOL = 1
 
 class DataPreprocessor:
-    def __init__(self, path = DATA_PATH, n = 50000):
-        if isinstance(path, str):
-            self.data = read_df(path, n)
-        elif isinstance(path, pd.DataFrame):
-            self.data = path 
-        else:
-            raise TypeError("path_or_df must be a string or a pandas DataFrame")
+    def __init__(self):
+        pass
 
     def label_target_wave(self, data):
         highs = data['high'].values
@@ -219,23 +214,23 @@ class DataPreprocessor:
 
 
     def handle_missing_values(self):
-        self.data = self.data.dropna()
+        self.data = self.data.dropna(axis = 0)
 
             
     def transform_for_pred(self, data):
-        preprocessor = DataPreprocessor(path=data)
-        preprocessor.add_time_features()
-        preprocessor.add_technical_indicators()
-        preprocessor.data = preprocessor.label_strong_target(preprocessor.data, pred = True)
-        preprocessor.handle_missing_values()
+        self.data = data
+        self.add_time_features()
+        self.add_technical_indicators()
+        self.label_strong_target(self.data, pred = True)
+        self.handle_missing_values()
         return self.data
 
     def transform_for_train(self, data):
-        preprocessor = DataPreprocessor(path=data)
-        preprocessor.add_time_features()
-        preprocessor.add_technical_indicators()
-        preprocessor.data = preprocessor.label_target_wave(preprocessor.data)
-        preprocessor.data = preprocessor.label_strong_target(preprocessor.data, pred = True)
-        preprocessor.handle_missing_values()
+        self.data = data
+        self.add_time_features()
+        self.add_technical_indicators()
+        self.data = self.label_target_wave(self.data)
+        self.data = self.label_strong_target(self.data, pred = True)
+        self.handle_missing_values()
         return self.data
 

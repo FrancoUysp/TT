@@ -1,5 +1,5 @@
 class BaseStrategy:
-    def __init__(self, model, data, execution_handler, params):
+    def __init__(self, model, params):
         """
         Initialize the base strategy.
 
@@ -8,8 +8,6 @@ class BaseStrategy:
         :param execution_handler: An object that handles the execution of trades.
         """
         self.model = model
-        self.data = data
-        self.execution_handler = execution_handler
         self.params = params
 
     def execute(self):

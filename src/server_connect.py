@@ -7,8 +7,7 @@ from .utils import read_df
 
 global buffer_df_mock_api
 buffer_df_mock_api = pd.DataFrame()
-BUFFER_SIZE = 300
-
+BUFFER_SIZE = 1320 
 
 
 def update_main():

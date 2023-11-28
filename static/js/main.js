@@ -25,7 +25,13 @@ function fetchAndDisplayCandlestickData() {
 
 function plotCandlestickChart(data) {
   const trace = {
-    x: data.map(row => new Date(row.datetime).toISOString()),
+    x: data.map(row => new Date(row.datetime).toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })),
     close: data.map(row => row.close),
     decreasing: { line: { color: '#ff4136' } },
     high: data.map(row => row.high),
@@ -37,39 +43,53 @@ function plotCandlestickChart(data) {
     yaxis: 'y'
   };
 
-  const layout = {
-    title: 'Candlestick Chart',
-    autosize: true,
-    height: window.innerHeight - document.getElementById('title-container').offsetHeight - 20,
-    xaxis: {
-      autorange: true,
-      title: 'Time',
-      rangeslider: { visible: false },
-      tickformat: '%H:%M:%S',
-      tickangle: -45,
-      automargin: true,
-      gridcolor: 'rgba(255, 255, 255, 0.1)'
-    },
-    yaxis: {
-      autorange: true,
-      title: 'Price',
-      gridcolor: 'rgba(255, 255, 255, 0.1)'
-    },
-    paper_bgcolor: '#000',
-    plot_bgcolor: '#000',
-    font: {
-      color: '#ffffff'
-    }
-  };
+const layout = {
+  title: 'Candlestick Chart',
+  autosize: true,
+  margin: { // Updated margins
+    l: 50,
+    r: 50,
+    b: 150, // Increase bottom margin to accommodate rotated labels
+    t: 50,
+    pad: 4
+  },
+  height: window.innerHeight - document.getElementById('title-container').offsetHeight - 20,
+  xaxis: {
+    autorange: true,
+    title: 'Time',
+    rangeslider: { visible: false}, // Range slider can help focus on specific intervals
+    tickformat: '%H:%M', // Simpler format
+    tickangle: -45, // Rotate labels to avoid overlap
+    automargin: true,
+    nticks: 20, // Limit the number of ticks to prevent crowding
+    gridcolor: 'rgba(255, 255, 255, 0.1)'
+  },
+  yaxis: {
+    autorange: true,
+    title: 'Price',
+    gridcolor: 'rgba(255, 255, 255, 0.1)'
+  },
+  paper_bgcolor: '#000',
+  plot_bgcolor: '#000',
+  font: {
+    color: '#ffffff'
+  }
+};
 
   Plotly.newPlot('graph-container', [trace], layout);
 }
 
 function fetchAndDisplayModels() {
-  fetch('/get_models').then(response => response.json()).then(modelsInfo => {
-    populateDropdown('model-dropdown', modelsInfo, 'params-container');
-    fetchActiveModels(); // Fetch active models for the right panel
-  });
+  fetch('/get_models')
+    .then(response => response.json())
+    .then(modelsInfo => {
+      populateDropdown('model-dropdown', modelsInfo, 'params-container');
+      fetchActiveModels(); // Fetch active models for the right panel
+    })
+    .catch(error => {
+      console.error('Error fetching models:', error);
+      alert('Failed to fetch models due to an error.');
+    });
 }
 
 function populateDropdown(dropdownId, models, paramsContainerId) {
@@ -83,36 +103,46 @@ function populateDropdown(dropdownId, models, paramsContainerId) {
     dropdown.add(option);
   });
 
+  // Automatically populate parameters for the first model
   if (models.length > 0) {
-    populateParameters(models[0], paramsContainerId);
+    populateParameters(models[0].params, paramsContainerId);
   }
 
   // Add change event listener to update parameters when a new model is selected
-  dropdown.onchange = function() {
+  dropdown.addEventListener('change', function() {
     let selectedModel = models.find(model => model.name === this.value);
     if (selectedModel) {
-      populateParameters(selectedModel, paramsContainerId);
+      populateParameters(selectedModel.params, paramsContainerId);
     }
-  };
+  });
 }
 
-function populateParameters(modelInfo, containerId) {
+function populateParameters(params, containerId) {
   const paramsContainer = document.getElementById(containerId);
-  paramsContainer.innerHTML = '';
+  paramsContainer.innerHTML = ''; // Clear previous parameters
 
-  for (const paramName in modelInfo.params) {
+  Object.entries(params).forEach(([key, value]) => {
     let paramDiv = document.createElement('div');
     paramDiv.className = 'param';
 
     let label = document.createElement('label');
-    label.innerText = `${paramName}:`;
+    label.innerText = `${key}:`;
+    label.htmlFor = `input-${key}`;
     let input = document.createElement('input');
+    input.id = `input-${key}`;
     input.type = 'text';
-    input.value = modelInfo.params[paramName];
+    input.value = value;
 
     paramDiv.appendChild(label);
     paramDiv.appendChild(input);
     paramsContainer.appendChild(paramDiv);
+  });
+}
+
+function handleAddModelClick() {
+  const params = collectParams('params-container');
+  if (params) {
+    addModel(params);
   }
 }
 
@@ -158,13 +188,6 @@ function collectParams(containerId, isUpdate = false) {
   }
 }
 
-function handleAddModelClick() {
-  const params = collectParams('params-container');
-  if (params) {
-    addModel(params);
-  }
-}
-
 function addModel(params) {
   fetch('/add_model', {
     method: 'POST',
@@ -186,11 +209,13 @@ function addModel(params) {
 }
 
 function fetchActiveModels() {
-  fetch('/get_active_models').then(response => response.json()).then(activeModels => {
-    populateDropdown('ava-model-dropdown', activeModels, 'ava-params-container');
-  });
+  return fetch('/get_active_models') // Ensure we return the fetch promise
+    .then(response => response.json())
+    .then(activeModels => {
+      populateDropdown('ava-model-dropdown', activeModels, 'ava-params-container');
+      return activeModels; // Resolve the promise with activeModels data
+    });
 }
-
 
 function handleUpdateClick() {
   const params = collectParams('ava-params-container', true);
@@ -209,8 +234,9 @@ function updateModel(params) {
   }).then(response => response.json()).then(data => {
     if (data.success) {
       alert('Model updated successfully.');
-      fetchActiveModels(); // This should update the dropdown
-      updateParametersDisplay(params.name); // Update the parameters display
+      fetchActiveModels().then(() => {
+        updateParametersDisplay(params.name); // Ensure that fetchActiveModels completes before this
+      });
     } else {
       alert('Error: ' + data.message);
     }
@@ -221,12 +247,16 @@ function updateModel(params) {
 }
 
 function updateParametersDisplay(updatedModelName) {
-  // Fetch the updated model's parameters
   fetch(`/get_model_params?name=${encodeURIComponent(updatedModelName)}`)
     .then(response => response.json())
     .then(data => {
-      populateParameters(data, 'ava-params-container'); // Update the parameters display
-      updateDropdownSelection(updatedModelName); // Ensure dropdown is set to the updated model
+      if (data.success) {
+        // Call populateParameters with the actual parameters, not an object containing the parameters
+        populateParameters(data.params, 'ava-params-container');
+        updateDropdownSelection(updatedModelName);
+      } else {
+        alert(`Error: ${data.message}`);
+      }
     })
     .catch(error => {
       console.error('Error fetching updated model parameters:', error);
