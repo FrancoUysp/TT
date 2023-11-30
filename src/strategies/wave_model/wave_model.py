@@ -115,31 +115,9 @@ class WaveModel(BaseStrategy):
 
     def exit_trade(self):
         if self.in_long_trade:
-            self.in_long_trade = False
-            self.trade_history.append(
-                {
-                    "long_exit_price": self.current_price,
-                    "units": -self.units,
-                    "date": self.latest_date,
-                }
-            )
-            roi_tuple = self.calculate_roi()
-            self.rois["daily"] = roi_tuple[0]
-            self.rois["monthly"] = roi_tuple[1]
-            self.rois["all_time"] = roi_tuple[2]
+            self.handle_long_exit(self.current_price, self.latest_date)
         elif self.in_short_trade:
-            self.in_short_trade = False
-            self.trade_history.append(
-                {
-                    "short_exit_price": self.current_price,
-                    "units": self.units,
-                    "date": self.latest_date,
-                }
-            )
-            roi_tuple = self.calculate_roi()
-            self.rois["daily"] = roi_tuple[0]
-            self.rois["monthly"] = roi_tuple[1]
-            self.rois["all_time"] = roi_tuple[2]
+            self.handle_short_exit(self.current_price, self.latest_date)
 
     def is_in_trade(self):
         return self.in_long_trade or self.in_short_trade
