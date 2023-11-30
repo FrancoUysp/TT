@@ -4,11 +4,6 @@ import os
 import json
 import threading
 from src.preprocess import DataPreprocessor
-from src.server_connect import (
-    append_to_buffer_and_update_main,
-    create_buffer_queue,
-    update_main,
-)
 from src.strategies.wave_model.wave_model import WaveModel
 from src.utils import *
 import time
@@ -17,13 +12,17 @@ from flask_cors import CORS
 
 HOST_IP = "0.0.0.0"
 HOST_PORT = 8000
-UPDATE_INTERVAL = 1
+UPDATE_INTERVAL = 0.01
 
 app = Flask(__name__)
 CORS(app)
 
 data_lock = Lock()
-buffer_df = None
+
+# Assuming the Server class is in the src.server_connect module
+from src.server_connect import Server
+
+server = Server()
 
 
 class MainServer:
@@ -31,8 +30,6 @@ class MainServer:
         """
         This class is the main server that runs in the background and updates the data.
         """
-        global buffer_df
-        buffer_df = create_buffer_queue()
         self.models = self.load_models()  # Load or initialize your models here
         self.update_thread = threading.Thread(target=self.update_data)
         self.update_thread.daemon = True
@@ -47,20 +44,18 @@ class MainServer:
         return models
 
     def update_data(self):
-        """
-        This method should be run in a separate thread and should update the data
-        """
-        global buffer_df
         while True:
             try:
                 with data_lock:
-                    buffer_df = append_to_buffer_and_update_main(buffer_df)
+                    server.buffer_df = server.append_to_buffer_and_update_main()
                     if self.models:
                         for model in self.models.values():
                             processed_data = self.preprocessor.transform_for_pred(
-                                buffer_df.copy()
+                                server.buffer_df.copy()
                             )
-                            model.execute(processed_data)
+                            model.execute(
+                                processed_data, server.buffer_df["datetime"].iloc[-1]
+                            )
 
             except Exception as e:
                 print(f"An error occurred: {e}")
@@ -70,17 +65,22 @@ class MainServer:
 
 @app.route("/get_data", methods=["GET"])
 def get_data():
-    """
-    This method should return the candle data in JSON format.
-    """
     with data_lock:
-        if buffer_df is not None:
-            data = buffer_df[["datetime", "open", "high", "low", "close"]].to_dict(
-                "records"
-            )
-            return jsonify(data)
-        else:
-            return jsonify({"error": "Data not available"}), 503
+        model_name = request.args.get("name")
+        response_data = {"candle_data": [], "trade_history": []}
+
+        if server.buffer_df is not None:
+            response_data["candle_data"] = server.buffer_df[
+                ["datetime", "open", "high", "low", "close"]
+            ].to_dict("records")
+
+        if model_name and model_name in main_server.models:
+            model = main_server.models[model_name]
+            trade_hist = model.get_trade_history()
+            print(trade_hist)
+            response_data["trade_history"] = trade_hist
+
+        return jsonify(response_data)
 
 
 @app.route("/get_models", methods=["GET"])
@@ -112,21 +112,43 @@ def get_models():
 @app.route("/add_model", methods=["POST"])
 def add_model():
     """
-    This method should add a new model to the system. that is currently training.
+    This method should add a new model to the system that is currently training.
     """
     model_params = request.json
     model_name = model_params.get("name")
     if not model_name:
         return jsonify({"success": False, "message": "Model name is required"}), 400
+
     with data_lock:
         if model_name in main_server.models:
             return jsonify({"success": False, "message": "Model already exists"}), 400
         else:
-            model_1 = pickle.load(open("models/wave_model/m1.pickle.dat", "rb"))
-            model_2 = pickle.load(open("models/wave_model/m2.pickle.dat", "rb"))
-            new_model = WaveModel(model_1, model_2, model_params)
-            main_server.models[model_name] = new_model
-            return jsonify({"success": True, "message": "Model added successfully"})
+            # Here, we assume the model files are pickled and stored in a directory named "models/wave_model/"
+            try:
+                model_1_path = os.path.join("models", "wave_model", "m1.pickle.dat")
+                model_2_path = os.path.join("models", "wave_model", "m2.pickle.dat")
+
+                # Make sure to handle the case where the files might not exist.
+                if not os.path.exists(model_1_path) or not os.path.exists(model_2_path):
+                    return (
+                        jsonify({"success": False, "message": "Model files not found"}),
+                        400,
+                    )
+
+                with open(model_1_path, "rb") as f1, open(model_2_path, "rb") as f2:
+                    model_1 = pickle.load(f1)
+                    model_2 = pickle.load(f2)
+
+                new_model = WaveModel(model_1, model_2, model_params, server)
+
+                main_server.models[model_name] = new_model
+                return jsonify({"success": True, "message": "Model added successfully"})
+            except Exception as e:
+                # Catch any other exceptions and return an error message.
+                return jsonify({"success": False, "message": str(e)}), 500
+
+
+# The MainServer class and server instance should be defined as per your previous structure.
 
 
 @app.route("/get_active_models", methods=["GET"])
@@ -190,8 +212,19 @@ def delete_model():
     with data_lock:
         model_name = request.json.get("name")
         if model_name and model_name in main_server.models:
-            del main_server.models[model_name]
-            return jsonify({"success": True, "message": "Model deleted successfully"})
+            model = main_server.models[model_name]
+            if model.is_in_trade() == True:
+                return jsonify(
+                    {
+                        "success": False,
+                        "message": "Cannot remove model that is in trade",
+                    }
+                )
+            else:
+                del main_server.models[model_name]
+                return jsonify(
+                    {"success": True, "message": "Model deleted successfully"}
+                )
         else:
             return jsonify({"success": False, "message": "Model not found"}), 404
 
@@ -213,6 +246,65 @@ def get_model_params():
             return jsonify({"success": False, "message": "Model not found"}), 404
 
 
+@app.route("/get_model_labels", methods=["GET"])
+def get_model_labels():
+    try:
+        with data_lock:
+            model_name = request.args.get("name")
+            if model_name and model_name in main_server.models:
+                model = main_server.models[model_name]
+                model_labels = model.get_labels()  # Get labels from the model
+                return jsonify({"success": True, "labels": model_labels})
+            else:
+                return jsonify({"success": False, "message": "Model not found"}), 404
+    except Exception as e:
+        print(str(e))
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/is_model_in_trade", methods=["GET"])
+def is_model_in_trade():
+    try:
+        model_name = request.args.get("name")
+        if model_name and model_name in main_server.models:
+            model = main_server.models[model_name]
+            is_in_trade = model.is_in_trade()
+            return jsonify({"status": "success", "is_in_trade": is_in_trade}), 200
+        else:
+            return jsonify({"status": "error", "message": "Model not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/exit_trade", methods=["GET"])
+def exit_trade():
+    try:
+        with data_lock:
+            model_name = request.args.get("name")
+            if model_name and model_name in main_server.models:
+                model = main_server.models[model_name]
+                if model.is_in_trade() == False:
+                    return (
+                        jsonify({"status": "error", "message": "Model not in trade"}),
+                        404,
+                    )
+                exit_status = model.exit_trade()
+                return (
+                    jsonify(
+                        {
+                            "status": "success",
+                            "message": "Trade exit executed",
+                            "exit_status": exit_status,
+                        }
+                    ),
+                    200,
+                )
+            else:
+                return jsonify({"status": "error", "message": "Model not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route("/")
 def index():
     """
@@ -222,6 +314,6 @@ def index():
 
 
 if __name__ == "__main__":
-    update_main()
+    server.update_main()
     main_server = MainServer()
     app.run(host=HOST_IP, port=HOST_PORT, debug=True)

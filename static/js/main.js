@@ -1,3 +1,6 @@
+const UPDATETIME = 2000;
+
+// Initialization and Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
   initializeUI();
 });
@@ -5,78 +8,159 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeUI() {
   fetchAndDisplayCandlestickData();
   fetchAndDisplayModels();
-
   setInterval(() => {
     fetchAndDisplayCandlestickData();
-  }, 2000);
+  }, UPDATETIME);
+  attachEventListeners();
+}
 
+function attachEventListeners() {
   document.getElementById('add-params').addEventListener('click', handleAddModelClick);
   document.getElementById('update-params').addEventListener('click', handleUpdateClick);
   document.getElementById('delete-model').addEventListener('click', handleDeleteClick);
-  document.getElementById('sell-all').addEventListener('click', handleSellAllClick);
-  document.getElementById('opt-out').addEventListener('click', handleOptOutClick);
+  document.getElementById('exit').addEventListener('click', handleExitClick);
+  document.getElementById('ava-model-dropdown').addEventListener('change', initializeLabelInterval);
+  initializeLabelInterval(); // Initialize on page load
 }
 
+// Data Fetching
 function fetchAndDisplayCandlestickData() {
-  fetch('/get_data').then(response => response.json()).then(data => {
-    plotCandlestickChart(data);
-  });
+  const selectedModelName = document.getElementById('ava-model-dropdown').value;
+  let url = '/get_data';
+
+  if (selectedModelName) {
+    url += `?name=${encodeURIComponent(selectedModelName)}`;
+  }
+
+  fetch(url)
+    .then(response => response.json())
+    .then(data => {
+      if (data && data.candle_data) {
+        console.log(data.candle_data);
+        console.log(data.trade_history);
+        plotCandlestickChart(data.candle_data, data.trade_history);
+      } else {
+        console.error('No data received from the server');
+      }
+    })
+    .catch(error => {
+      console.error('Error fetching data:', error);
+    });
 }
 
-function plotCandlestickChart(data) {
-  const trace = {
-    x: data.map(row => new Date(row.datetime).toLocaleString('en-US', {
+function plotCandlestickChart(candleData, tradeHistory) {
+  const candleTrace = {
+    x: candleData.map(row => new Date(row.datetime).toLocaleString('en-US', {
       month: 'numeric',
       day: 'numeric',
       year: '2-digit',
       hour: '2-digit',
       minute: '2-digit'
     })),
-    close: data.map(row => row.close),
+    close: candleData.map(row => row.close),
     decreasing: { line: { color: '#ff4136' } },
-    high: data.map(row => row.high),
+    high: candleData.map(row => row.high),
     increasing: { line: { color: '#2ecc40' } },
-    low: data.map(row => row.low),
-    open: data.map(row => row.open),
+    low: candleData.map(row => row.low),
+    open: candleData.map(row => row.open),
     type: 'candlestick',
     xaxis: 'x',
     yaxis: 'y'
   };
 
-const layout = {
-  title: 'Candlestick Chart',
-  autosize: true,
-  margin: { // Updated margins
-    l: 50,
-    r: 50,
-    b: 150, // Increase bottom margin to accommodate rotated labels
-    t: 50,
-    pad: 4
-  },
-  height: window.innerHeight - document.getElementById('title-container').offsetHeight - 20,
-  xaxis: {
-    autorange: true,
-    title: 'Time',
-    rangeslider: { visible: false}, // Range slider can help focus on specific intervals
-    tickformat: '%H:%M', // Simpler format
-    tickangle: -45, // Rotate labels to avoid overlap
-    automargin: true,
-    nticks: 20, // Limit the number of ticks to prevent crowding
-    gridcolor: 'rgba(255, 255, 255, 0.1)'
-  },
-  yaxis: {
-    autorange: true,
-    title: 'Price',
-    gridcolor: 'rgba(255, 255, 255, 0.1)'
-  },
-  paper_bgcolor: '#000',
-  plot_bgcolor: '#000',
-  font: {
-    color: '#ffffff'
-  }
-};
+  // Create arrays for each type of trade signal
+  const longEntrySignals = [];
+  const longExitSignals = [];
+  const shortEntrySignals = [];
+  const shortExitSignals = [];
 
-  Plotly.newPlot('graph-container', [trace], layout);
+  // Process trade history to populate the signal arrays
+  tradeHistory.forEach(trade => {
+    const dateTime = new Date(trade.date).toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    if (trade.long_entry_price) {
+      longEntrySignals.push({ x: dateTime, y: trade.long_entry_price });
+    } else if (trade.long_exit_price) {
+      longExitSignals.push({ x: dateTime, y: trade.long_exit_price });
+    } else if (trade.short_entry_price) {
+      shortEntrySignals.push({ x: dateTime, y: trade.short_entry_price });
+    } else if (trade.short_exit_price) {
+      shortExitSignals.push({ x: dateTime, y: trade.short_exit_price });
+    }
+  });
+
+  // Create scatter plot traces for each type of signal
+  const longEntryTrace = {
+    x: longEntrySignals.map(signal => signal.x),
+    y: longEntrySignals.map(signal => signal.y),
+    mode: 'markers',
+    marker: { size: 10, color: 'green' },
+    name: 'Long Entry'
+  };
+
+  const longExitTrace = {
+    x: longExitSignals.map(signal => signal.x),
+    y: longExitSignals.map(signal => signal.y),
+    mode: 'markers',
+    marker: { size: 10, color: 'blue' },
+    name: 'Long Exit'
+  };
+
+  const shortEntryTrace = {
+    x: shortEntrySignals.map(signal => signal.x),
+    y: shortEntrySignals.map(signal => signal.y),
+    mode: 'markers',
+    marker: { size: 10, color: 'red' },
+    name: 'Short Entry'
+  };
+
+  const shortExitTrace = {
+    x: shortExitSignals.map(signal => signal.x),
+    y: shortExitSignals.map(signal => signal.y),
+    mode: 'markers',
+    marker: { size: 10, color: 'orange' },
+    name: 'Short Exit'
+  };
+
+  const layout = {
+    title: 'Candlestick Chart',
+    autosize: true,
+    margin: { // Updated margins
+      l: 50,
+      r: 50,
+      b: 150, // Increase bottom margin to accommodate rotated labels
+      t: 50,
+      pad: 4
+    },
+    height: window.innerHeight - document.getElementById('title-container').offsetHeight - 20,
+    xaxis: {
+      autorange: true,
+      title: 'Time',
+      rangeslider: { visible: false }, // Range slider can help focus on specific intervals
+      tickformat: '%H:%M', // Simpler format
+      tickangle: -45, // Rotate labels to avoid overlap
+      automargin: true,
+      nticks: 20, // Limit the number of ticks to prevent crowding
+      gridcolor: 'rgba(255, 255, 255, 0.1)'
+    },
+    yaxis: {
+      autorange: true,
+      title: 'Price',
+      gridcolor: 'rgba(255, 255, 255, 0.1)'
+    },
+    paper_bgcolor: '#000',
+    plot_bgcolor: '#000',
+    font: {
+      color: '#ffffff'
+    }
+  };
+
+  Plotly.newPlot('graph-container', [candleTrace, longEntryTrace, longExitTrace, shortEntryTrace, shortExitTrace], layout);
 }
 
 function fetchAndDisplayModels() {
@@ -292,6 +376,7 @@ function deleteModel(modelName) {
       alert('Model deleted successfully.');
       fetchActiveModels(); // Refresh the list of active models
       clearParameters('ava-params-container'); // Clear the parameters display area
+      clearLabels('model-labels-container'); // Also clear the labels display area
     } else {
       alert('Error: ' + data.message);
     }
@@ -301,15 +386,117 @@ function deleteModel(modelName) {
   });
 }
 
+function clearLabels(containerId) {
+  const labelsContainer = document.getElementById(containerId);
+  labelsContainer.innerHTML = ''; // Clear the inner HTML, removing label fields
+}
+
 function clearParameters(containerId) {
   const paramsContainer = document.getElementById(containerId);
   paramsContainer.innerHTML = ''; // Clear the inner HTML, removing parameter fields
 }
 
-function handleSellAllClick() {
-  alert('Sell All functionality not implemented.');
+let labelInterval;
+
+function fetchAndDisplayLabels(modelName, containerId) {
+  fetch(`/get_model_labels?name=${encodeURIComponent(modelName)}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (data.success) {
+        displayLabels(data.labels, containerId);
+      } else {
+        console.error(`Error: ${data.message}`);
+      }
+    })
+    .catch(error => {
+      console.error('Error fetching model labels:', error);
+    });
 }
 
-function handleOptOutClick() {
-  alert('Opt Out functionality not implemented.');
+function displayLabels(labels, containerId) {
+  const labelsContainer = document.getElementById(containerId);
+  labelsContainer.innerHTML = ''; // Clear the container before adding new labels
+
+  Object.entries(labels).forEach(([key, value]) => {
+    let labelDiv = document.createElement('div');
+    labelDiv.className = 'label';
+
+    let labelName = document.createElement('span');
+    labelName.innerText = `${key}: `;
+    labelName.className = 'label-name';
+
+    let labelValue = document.createElement('span');
+    labelValue.innerText = value;
+    labelValue.className = 'label-value';
+
+    labelDiv.appendChild(labelName);
+    labelDiv.appendChild(labelValue);
+    labelsContainer.appendChild(labelDiv);
+  });
 }
+
+function initializeLabelInterval() {
+  clearInterval(labelInterval); // Clear existing interval if any
+  const selectedModelName = document.getElementById('ava-model-dropdown').value;
+  fetchAndDisplayLabels(selectedModelName, 'model-labels-container');
+  labelInterval = setInterval(() => {
+    const selectedModelName = document.getElementById('ava-model-dropdown').value;
+    fetchAndDisplayLabels(selectedModelName, 'model-labels-container');
+  }, UPDATETIME);
+}
+
+document.getElementById('ava-model-dropdown').addEventListener('change', initializeLabelInterval);
+initializeLabelInterval(); // Initialize on page load
+
+function checkIfModelInTrade(modelName) {
+  return fetch(`/is_model_in_trade?name=${encodeURIComponent(modelName)}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to check trade status.');
+      }
+      return response.json();
+    });
+}
+
+function exitTrade(modelName) {
+  return fetch(`/exit_trade?name=${encodeURIComponent(modelName)}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to execute trade exit.');
+      }
+      return response.json();
+    });
+}
+
+function handleExitClick() {
+  const modelName = document.getElementById('ava-model-dropdown').value;
+  if (!modelName) {
+    alert('No model selected to exit trade.');
+    return;
+  }
+
+  checkIfModelInTrade(modelName)
+    .then(data => {
+      if (data.status === 'success' && data.is_in_trade) {
+        return exitTrade(modelName);
+      } else {
+        throw new Error('Model is not in an active trade.');
+      }
+    })
+    .then(data => {
+      if (data.status === 'success') {
+        alert('Trade exit executed successfully for model: ' + modelName);
+      } else {
+        throw new Error('Error exiting trade: ' + data.message);
+      }
+    })
+    .catch(error => {
+      alert(error.message);
+    });
+}
+
