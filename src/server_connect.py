@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 from .utils import read_df
-# import MetaTrader5 as mt5
+import MetaTrader5 as mt5
 import numpy as np
 from datetime import datetime, timedelta
 
@@ -9,7 +9,7 @@ class Server:
 
     BUFFER_SIZE = 1320 
     SYMBOL = 'NAS100.a'
-    # TIMEFRAME = mt5.TIMEFRAME_M1
+    TIMEFRAME = mt5.TIMEFRAME_M1
 
     SERVER = "MetaQuotes-Demo"
     PASSWORD = ""
@@ -17,98 +17,130 @@ class Server:
     
 
     def __init__(self):
-        self.buffer_df_mock_api = pd.DataFrame()
         self.buffer_df = self.create_buffer_queue()
-        self.positions = {}  # Stores the state of positions for each model
-        # self.init_connection()
+        self.positions = {}  
+        self.init_connection()
 
     def create_buffer_queue(self):
         """
-        This method will create the current queue that is
-        in memory and will be used to process and make decisions.
+        This method will create the current queue that is in memory and will be used to process and make decisions.
         """
-        file = os.path.join("data", "main.csv")
-        main_df = read_df(file)
-        self.buffer_df_mock_api = main_df.tail(2 * self.BUFFER_SIZE)
-        self.buffer_df = self.buffer_df_mock_api.head(self.BUFFER_SIZE)
-        self.buffer_df_mock_api = self.buffer_df_mock_api.tail(self.BUFFER_SIZE)
-        return self.buffer_df
+        file_path = os.path.join("..", "data", "main.csv")
+        if os.path.exists(file_path):
+            main_df = read_df(file_path)
+            buffer_df = main_df.tail(self.BUFFER_SIZE)
+            return buffer_df
+        else:
+            print("File not found:", file_path)
+            return pd.DataFrame()
 
     def append_to_buffer_and_update_main(self):
         """
-        this method is meant to fetch the last minute from the brokerage
+        This method is meant to fetch the last minute from the brokerage
         and append it to the buffer queue. It also removes the last element
-        in the buffer queue (the oldest)
+        in the buffer queue (the oldest).
         """
-        self.buffer_df = self.buffer_df.iloc[1:]
-        self.buffer_df = pd.concat([self.buffer_df, self.buffer_df_mock_api.head(1)], ignore_index=True)
-        self.buffer_df_mock_api = self.buffer_df_mock_api.iloc[1:]
+        if not self.init_connection():
+            print("Error initializing MetaTrader 5")
+            return self.buffer_df
+
+        latest_buffer_time = self.buffer_df['datetime'].iloc[-1]
+        
+        # Calculate the current server time with a 3-hour offset
+        server_time = datetime.now() + timedelta(hours=3)
+        server_time = server_time.replace(microsecond=0, second=0, minute=server_time.minute)
+
+        # Check if latest buffer time is up to date
+        if latest_buffer_time >= server_time - timedelta(minutes=1):
+            self.close_connection()
+            return self.buffer_df
+
+        # Fetch the next minute's data
+        next_time = latest_buffer_time + timedelta(minutes=1)
+        rates = mt5.copy_rates_from(self.SYMBOL, self.TIMEFRAME, int(next_time.timestamp()), 1)
+
+        if rates is None or len(rates) == 0:
+            print("Error fetching new data from MT5:", mt5.last_error())
+            self.close_connection()
+            return self.buffer_df
+
+        new_data = pd.DataFrame(rates)
+        new_data['datetime'] = pd.to_datetime(new_data['time'], unit='s')
+        new_data = new_data[['datetime', 'open', 'high', 'low', 'close']]
+
+        # Append the new data to the buffer and remove the oldest entry
+        self.buffer_df = pd.concat([self.buffer_df.iloc[1:], new_data], ignore_index=True)
+
+        file = os.path.join("..", "data", "main.csv")
+        new_data.to_csv(file, mode='a', header=False, index=False)
+
+        self.close_connection()
         return self.buffer_df
 
     def update_main(self):
-        # file = os.path.join("data", "main.csv")
-        # main_df = read_df(file)
-        # last_entry_time = main_df['datetime'].iloc[-1]
+        file = os.path.join("..", "data", "main.csv")
+        main_df = read_df(file)
+        last_entry_time = main_df['datetime'].iloc[-1]
 
-        # symbol = "NAS100.a"
-        # timeframe = mt5.TIMEFRAME_M1
+        symbol = "NAS100.a"
+        timeframe = mt5.TIMEFRAME_M1
 
-        # server_time = datetime.now() + timedelta(hours=3)
-        # server_time = server_time.replace(microsecond=0, second=0, minute=server_time.minute)
+        server_time = datetime.now() + timedelta(hours=3)
+        server_time = server_time.replace(microsecond=0, second=0, minute=server_time.minute)
 
-        # last_entry_unix = int(last_entry_time.timestamp())
-        # server_time_unix = int(server_time.timestamp())
+        last_entry_unix = int(last_entry_time.timestamp())
+        server_time_unix = int(server_time.timestamp())
 
-        # MAX_DURATION = 30000 * 60
-        # total_duration = server_time_unix - last_entry_unix
-        # num_chunks = (total_duration + MAX_DURATION - 1) // MAX_DURATION
+        MAX_DURATION = 30000 * 60
+        total_duration = server_time_unix - last_entry_unix
+        num_chunks = (total_duration + MAX_DURATION - 1) // MAX_DURATION
 
-        # all_data = []
+        all_data = []
 
-        # for i in range(num_chunks):
-        #     start_time = last_entry_unix + i * MAX_DURATION
-        #     end_time = min(last_entry_unix + (i + 1) * MAX_DURATION, server_time_unix)
+        for i in range(num_chunks):
+            start_time = last_entry_unix + i * MAX_DURATION
+            end_time = min(last_entry_unix + (i + 1) * MAX_DURATION, server_time_unix)
 
-        #     segment_data = mt5.copy_rates_range(symbol, timeframe, start_time, end_time)
-        #     if segment_data is not None and len(segment_data) > 0:
-        #         all_data.extend(segment_data)
-        #     else:
-        #         print(f"Error fetching data for chunk {i+1}. Checking error...")
-        #         error = mt5.last_error()
-        #         print("Error in MT5:", error)
+            segment_data = mt5.copy_rates_range(symbol, timeframe, start_time, end_time)
+            if segment_data is not None and len(segment_data) > 0:
+                all_data.extend(segment_data)
+            else:
+                print(f"Error fetching data for chunk {i+1}. Checking error...")
+                error = mt5.last_error()
+                print("Error in MT5:", error)
 
-        # if all_data:
-        #     columns = ['time', 'open', 'high', 'low', 'close']
-        #     df = pd.DataFrame(all_data, columns=columns)
-        #     df['datetime'] = pd.to_datetime(df['time'], unit='s')
-        #     df = df[['datetime', 'open', 'high', 'low', 'close']]
-        #     df = df[df['datetime'] > last_entry_time]
+        if all_data:
+            columns = ['time', 'open', 'high', 'low', 'close']
+            df = pd.DataFrame(all_data, columns=columns)
+            df['datetime'] = pd.to_datetime(df['time'], unit='s')
+            df = df[['datetime', 'open', 'high', 'low', 'close']]
+            df = df[df['datetime'] > last_entry_time]
 
-        #     df.to_csv(file, mode='a', header=False, index=False)
-        #     print("Main.csv updated successfully!")
-        pass
+            df.to_csv(file, mode='a', header=False, index=False)
+            print("Main.csv updated successfully!")
 
-    # def init_connection(self):
-    #     """
-    #     This method is meant to initialize the connection with the brokerage.
-    #     """
-    #     try:
-    #         if not mt5.initialize():
-    #             print("Error initializing MetaTrader 5")
-    #             return False
-    #         return True
-    #     except Exception as e:
-    #         print(e)
-    #         return False
+    def init_connection(self):
+        """
+        Initialize the connection with the brokerage using the predefined credentials.
+        """
+        try:
+            if not mt5.initialize(login=self.LOGIN, password=self.PASSWORD, server=self.SERVER):
+                print("Error initializing MetaTrader 5: ", mt5.last_error())
+                return False
+            print("MT5 Initialized successfully.")
+            return True
+        except Exception as e:
+            print("Exception occurred during MT5 initialization: ", e)
+            return False
 
-    # def close_connection(self):
-    #     """
-    #     This method is meant to close the connection with the brokerage.
-    #     """
-    #     try:
-    #         mt5.shutdown()
-    #     except Exception as e:
-    #         print(e)
+    def close_connection(self):
+        """
+        This method is meant to close the connection with the brokerage.
+        """
+        try:
+            mt5.shutdown()
+        except Exception as e:
+            print(e)
 
     def place_long(self, name, quantity, symbol=SYMBOL):
         """
