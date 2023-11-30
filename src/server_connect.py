@@ -16,8 +16,8 @@ class Server:
     PASSWORD = "duCf7yzn:h"
     LOGIN = 61202587
     
-
     def __init__(self):
+        self.is_connected = False
         self.buffer_df = self.create_buffer_queue()
         self.positions = {}  
         self.init_connection()
@@ -37,13 +37,14 @@ class Server:
 
     def append_to_buffer_and_update_main(self):
         """
-        This method is meant to fetch the last minute from the brokerage
-        and append it to the buffer queue. It also removes the last element
+        This method fetches the last minute from the brokerage
+        and appends it to the buffer queue. It also removes the last element
         in the buffer queue (the oldest).
         """
-        if not self.init_connection():
-            print("Error initializing MetaTrader 5")
-            return self.buffer_df
+        if not self.is_connected:
+            if not self.init_connection():
+                print("Error initializing MetaTrader 5")
+                return self.buffer_df
 
         latest_buffer_time = self.buffer_df['datetime'].iloc[-1]
         
@@ -69,9 +70,15 @@ class Server:
         new_data['datetime'] = pd.to_datetime(new_data['time'], unit='s')
         new_data = new_data[['datetime', 'open', 'high', 'low', 'close']]
 
+        # Check if the new data is already in the buffer
+        if not new_data['datetime'].iloc[-1] > latest_buffer_time:
+            self.close_connection()
+            return self.buffer_df
+
         # Append the new data to the buffer and remove the oldest entry
         self.buffer_df = pd.concat([self.buffer_df.iloc[1:], new_data], ignore_index=True)
 
+        # Append the new data to main.csv
         file = os.path.join("data", "main.csv")
         new_data.to_csv(file, mode='a', header=False, index=False)
 
@@ -133,6 +140,7 @@ class Server:
                 print("Error initializing MetaTrader 5: ", mt5.last_error())
                 return False
             print("MT5 Initialized successfully.")
+            self.is_connected = True
             return True
         except Exception as e:
             print("Exception occurred during MT5 initialization: ", e)
