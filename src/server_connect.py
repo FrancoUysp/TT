@@ -1,4 +1,5 @@
 import pandas as pd
+import sys
 import os
 from .utils import read_df
 import MetaTrader5 as mt5
@@ -8,12 +9,12 @@ from datetime import datetime, timedelta
 class Server:
 
     BUFFER_SIZE = 1320 
-    SYMBOL = 'NAS100.a'
+    SYMBOL = 'NAS100'
     TIMEFRAME = mt5.TIMEFRAME_M1
 
-    SERVER = "MetaQuotes-Demo"
-    PASSWORD = ""
-    LOGIN = 0
+    SERVER = "Pepperstone-Demo"
+    PASSWORD = "duCf7yzn:h"
+    LOGIN = 61202587
     
 
     def __init__(self):
@@ -25,7 +26,7 @@ class Server:
         """
         This method will create the current queue that is in memory and will be used to process and make decisions.
         """
-        file_path = os.path.join("..", "data", "main.csv")
+        file_path = os.path.join("data", "main.csv")
         if os.path.exists(file_path):
             main_df = read_df(file_path)
             buffer_df = main_df.tail(self.BUFFER_SIZE)
@@ -71,53 +72,57 @@ class Server:
         # Append the new data to the buffer and remove the oldest entry
         self.buffer_df = pd.concat([self.buffer_df.iloc[1:], new_data], ignore_index=True)
 
-        file = os.path.join("..", "data", "main.csv")
+        file = os.path.join("data", "main.csv")
         new_data.to_csv(file, mode='a', header=False, index=False)
 
         self.close_connection()
         return self.buffer_df
 
     def update_main(self):
-        file = os.path.join("..", "data", "main.csv")
+        file = os.path.join("data", "main.csv")  
         main_df = read_df(file)
+
         last_entry_time = main_df['datetime'].iloc[-1]
 
-        symbol = "NAS100.a"
-        timeframe = mt5.TIMEFRAME_M1
 
-        server_time = datetime.now() + timedelta(hours=3)
-        server_time = server_time.replace(microsecond=0, second=0, minute=server_time.minute)
+        symbol = "NAS100"
+        timeframe = mt5.TIMEFRAME_M1  
+
+        server_time = (datetime.now() + timedelta(hours=3)).replace(microsecond=0) - timedelta(minutes=1)
 
         last_entry_unix = int(last_entry_time.timestamp())
         server_time_unix = int(server_time.timestamp())
 
-        MAX_DURATION = 30000 * 60
+        MAX_DURATION = 30000 * 60  
+
         total_duration = server_time_unix - last_entry_unix
         num_chunks = (total_duration + MAX_DURATION - 1) // MAX_DURATION
 
-        all_data = []
+        all_data = []  
 
         for i in range(num_chunks):
             start_time = last_entry_unix + i * MAX_DURATION
             end_time = min(last_entry_unix + (i + 1) * MAX_DURATION, server_time_unix)
 
+            print(f"symbol: {symbol}, timeframe: {timeframe}, start_time: {start_time}, end_time:{end_time}")
             segment_data = mt5.copy_rates_range(symbol, timeframe, start_time, end_time)
-            if segment_data is not None and len(segment_data) > 0:
+            if segment_data.size > 0:
                 all_data.extend(segment_data)
             else:
                 print(f"Error fetching data for chunk {i+1}. Checking error...")
                 error = mt5.last_error()
                 print("Error in MT5:", error)
 
-        if all_data:
-            columns = ['time', 'open', 'high', 'low', 'close']
-            df = pd.DataFrame(all_data, columns=columns)
-            df['datetime'] = pd.to_datetime(df['time'], unit='s')
-            df = df[['datetime', 'open', 'high', 'low', 'close']]
-            df = df[df['datetime'] > last_entry_time]
+        all_data = np.array(all_data)
 
-            df.to_csv(file, mode='a', header=False, index=False)
-            print("Main.csv updated successfully!")
+        columns = ['time', 'open', 'high', 'low', 'close', "s", "s2", "s3"]
+        df = pd.DataFrame(all_data, columns=columns)
+        df['datetime'] = pd.to_datetime(df['time'], unit='s')
+        df = df[['datetime', 'open', 'high', 'low', 'close']]
+        df = df[df['datetime'] > last_entry_time]
+
+        df.to_csv(file, mode='a', header=False, index=False)
+        print("Main.csv updated successfully!")
 
     def init_connection(self):
         """

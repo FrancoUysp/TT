@@ -12,7 +12,7 @@ from flask_cors import CORS
 
 HOST_IP = "0.0.0.0"
 HOST_PORT = 8000
-UPDATE_INTERVAL = 0.01
+UPDATE_INTERVAL = 3 
 
 app = Flask(__name__)
 CORS(app)
