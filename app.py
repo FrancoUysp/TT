@@ -13,7 +13,7 @@ from flask_cors import CORS
 
 HOST_IP = "0.0.0.0"
 HOST_PORT = 8000
-UPDATE_INTERVAL = 3 
+UPDATE_INTERVAL = 5
 
 app = Flask(__name__)
 CORS(app)
@@ -46,9 +46,10 @@ class MainServer:
 
     def update_data(self):
         while True:
+            start_time = time.time()
             try:
                 with data_lock:
-                    server.buffer_df = server.append_to_buffer_and_update_main()
+                    server.append_to_buffer_and_update_main()
                     if self.models:
                         for model in self.models.values():
                             processed_data = self.preprocessor.transform_for_pred(
@@ -60,8 +61,10 @@ class MainServer:
 
             except Exception as e:
                 print(f"An error occurred: {e}")
-
-            time.sleep(UPDATE_INTERVAL)
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            time_to_sleep = max(0, UPDATE_INTERVAL - elapsed_time)
+            time.sleep(time_to_sleep)
 
 
 @app.route("/get_data", methods=["GET"])
