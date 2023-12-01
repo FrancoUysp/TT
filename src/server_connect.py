@@ -17,6 +17,8 @@ class Server:
     LOGIN = 61202587
     
     def __init__(self):
+        self.update_main()
+        self.last_processed_data = None  # New attribute to track the last processed data
         self.buffer_df = self.create_buffer_queue()
         self.positions = {}  
         self.init_connection()
@@ -37,18 +39,15 @@ class Server:
     def append_to_buffer_and_update_main(self):
         """
         Fetch the data from the previous minute from the brokerage
-        and append it to the buffer queue. It also removes the oldest element
-        in the buffer queue.
+        and update the main.csv file. Then, read the last rows of main.csv as the buffer.
         """
         if not self.init_connection():
             print("Error initializing MetaTrader 5")
             return self.buffer_df
 
-        # Calculate the server time with a 3-hour offset and adjust to the previous minute
         server_time = datetime.now() + timedelta(hours=2)
         server_time = server_time.replace(microsecond=0, second=0) - timedelta(minutes=1)
 
-        # Fetch data for the previous minute
         rates = mt5.copy_rates_from(self.SYMBOL, self.TIMEFRAME, int(server_time.timestamp()), 1)
 
         if rates is None or len(rates) == 0:
@@ -60,30 +59,38 @@ class Server:
         new_data['datetime'] = pd.to_datetime(new_data['time'], unit='s')
         new_data = new_data[['datetime', 'open', 'high', 'low', 'close']]
 
-        # Load the main.csv file to check if the new data already exists
-        file = os.path.join("data", "main.csv")
-        main_df = pd.read_csv(file, parse_dates=['datetime'])
-
-        if new_data['datetime'].iloc[0] <= main_df['datetime'].iloc[-1]:
-            # If the new data is not newer than the last entry in main.csv, don't append
+        # Check if new_data is the same as the last processed data
+        if self.last_processed_data is not None and new_data.equals(self.last_processed_data):
             self.close_connection()
             return self.buffer_df
 
-        # Append the new data to the buffer and remove the oldest entry
-        self.buffer_df = pd.concat([self.buffer_df.iloc[1:], new_data], ignore_index=True)
+        # Update last_processed_data
 
-        # Append the new data to main.csv
-        new_data.to_csv(file, mode='a', header=False, index=False)
+        file = os.path.join("data", "main.csv")
+        main_df = pd.read_csv(file, parse_dates=['datetime'])
+
+        if new_data['datetime'].iloc[0] > main_df['datetime'].iloc[-1]:
+            # Append new data to main.csv
+            new_data.to_csv(file, mode='a', header=False, index=False)
+            self.last_processed_data = new_data
+
+        # Read the last BUFFER_SIZE rows from main.csv to update the buffer
+        buffer_df = pd.read_csv(file, parse_dates=['datetime']).tail(self.BUFFER_SIZE)
 
         self.close_connection()
-        return self.buffer_df
+        return buffer_df
+
+
 
     def update_main(self):
+        if not self.init_connection():
+            print("Error initializing MetaTrader 5")
+            return self.buffer_df
+
         file = os.path.join("data", "main.csv")  
         main_df = read_df(file)
 
         last_entry_time = main_df['datetime'].iloc[-1]
-
 
         symbol = "NAS100"
         timeframe = mt5.TIMEFRAME_M1  

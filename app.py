@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request, render_template
+import datetime
 import sys
 import pickle
 import os
@@ -23,14 +24,12 @@ data_lock = Lock()
 # Assuming the Server class is in the src.server_connect module
 from src.server_connect import Server
 
-server = Server()
-
-
 class MainServer:
     def __init__(self):
         """
         This class is the main server that runs in the background and updates the data.
         """
+        self.server = Server()
         self.models = self.load_models()  # Load or initialize your models here
         self.update_thread = threading.Thread(target=self.update_data)
         self.update_thread.daemon = True
@@ -45,19 +44,23 @@ class MainServer:
         return models
 
     def update_data(self):
+        last_minute = -1
         while True:
             start_time = time.time()
             try:
                 with data_lock:
-                    server.append_to_buffer_and_update_main()
-                    if self.models:
-                        for model in self.models.values():
-                            processed_data = self.preprocessor.transform_for_pred(
-                                server.buffer_df.copy()
-                            )
-                            model.execute(
-                                processed_data, server.buffer_df["datetime"].iloc[-1]
-                            )
+                    if last_minute != datetime.datetime.now().minute:
+                        print("fetching new minute data")
+                        last_minute = datetime.datetime.now().minute
+                        self.server.buffer_df = self.server.append_to_buffer_and_update_main()
+                        if self.models:
+                            for model in self.models.values():
+                                processed_data = self.preprocessor.transform_for_pred(
+                                    self.server.buffer_df.copy()
+                                )
+                                model.execute(
+                                    processed_data, self.server.buffer_df["datetime"].iloc[-1]
+                                )
 
             except Exception as e:
                 print(f"An error occurred: {e}")
@@ -73,15 +76,14 @@ def get_data():
         model_name = request.args.get("name")
         response_data = {"candle_data": [], "trade_history": []}
 
-        if server.buffer_df is not None:
-            response_data["candle_data"] = server.buffer_df[
+        if main_server.server.buffer_df is not None:
+            response_data["candle_data"] = main_server.server.buffer_df[
                 ["datetime", "open", "high", "low", "close"]
             ].to_dict("records")
 
         if model_name and model_name in main_server.models:
             model = main_server.models[model_name]
             trade_hist = model.get_trade_history()
-            print(trade_hist)
             response_data["trade_history"] = trade_hist
 
         return jsonify(response_data)
@@ -143,7 +145,7 @@ def add_model():
                     model_1 = pickle.load(f1)
                     model_2 = pickle.load(f2)
 
-                new_model = WaveModel(model_1, model_2, model_params, server)
+                new_model = WaveModel(model_1, model_2, model_params, main_server.server)
 
                 main_server.models[model_name] = new_model
                 return jsonify({"success": True, "message": "Model added successfully"})
@@ -318,6 +320,5 @@ def index():
 
 
 if __name__ == "__main__":
-    server.update_main()
     main_server = MainServer()
     app.run(host=HOST_IP, port=HOST_PORT, debug=True)
