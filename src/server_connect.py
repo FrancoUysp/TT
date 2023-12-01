@@ -146,46 +146,161 @@ class Server:
             print(e)
 
     def place_long(self, name, quantity, symbol=SYMBOL):
-        """
-        This method is meant to place a long order with the brokerage.
-        """
         if name not in self.positions:
             self.positions[name] = []
 
-        # Ensure no existing long position for this model before placing a new one
         if not any(pos['type'] == 'long' for pos in self.positions[name]):
+            # Fetch account information to check for sufficient margin
+            account_info = mt5.account_info()
+            if not account_info:
+                print("Failed to get account information")
+                return
+
+            # Check if there is enough free margin to place the order
+            symbol_info = mt5.symbol_info(symbol)
+            if not symbol_info:
+                print(f"Symbol info could not be retrieved for {symbol}")
+                return
+
+            cost_of_one_lot = symbol_info.trade_contract_size * mt5.symbol_info_tick(symbol).ask
+            if account_info.free_margin < cost_of_one_lot * quantity:
+                print("Insufficient margin to place long order")
+                return
+
             self.positions[name].append({'symbol': symbol, 'quantity': quantity, 'type': 'long'})
-            # TODO: Add the MT5 API call to place a long order here
+            
+            # MT5 API Call to Place a Long Order
+            trade_request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": quantity,
+                "type": mt5.ORDER_TYPE_BUY,
+                "price": mt5.symbol_info_tick(symbol).ask,
+                "sl": 0,  # Stop Loss
+                "tp": 0,  # Take Profit
+                "deviation": 20,
+                "magic": 0,
+                "comment": f"Long order by {name}",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+
+            result = mt5.order_send(trade_request)
+            if result.retcode != mt5.TRADE_RETCODE_DONE:
+                print(f"Failed to place long order: {result.comment}")
+            else:
+                print(f"Long order placed successfully for {name}")
 
     def exit_long(self, name, symbol=SYMBOL):
-        """
-        This method is meant to exit a long order with the brokerage.
-        """
-        # Remove the long position for this model
         if name in self.positions:
-            self.positions[name] = [pos for pos in self.positions[name] if not (pos['symbol'] == symbol and pos['type'] == 'long')]
-            # TODO: Add the MT5 API call to exit a long order here
+            long_positions = [pos for pos in self.positions[name] if pos['symbol'] == symbol and pos['type'] == 'long']
+            if not long_positions:
+                print(f"No long positions found for {name} on {symbol}")
+                return
 
-    def place_short(self, name, quantity,symbol=SYMBOL):
-        """
-        This method is meant to place a short order with the brokerage.
-        """
+            # Assuming you want to close the first long position found
+            position_to_close = long_positions[0]
+
+            # MT5 API Call to Exit a Long Order
+            trade_request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": position_to_close['quantity'],
+                "type": mt5.ORDER_TYPE_SELL,
+                "price": mt5.symbol_info_tick(symbol).bid,
+                "sl": 0,  # Stop Loss
+                "tp": 0,  # Take Profit
+                "deviation": 20,
+                "magic": 0,
+                "comment": f"Exiting long for {name}",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+
+            result = mt5.order_send(trade_request)
+            if result.retcode != mt5.TRADE_RETCODE_DONE:
+                print(f"Failed to exit long position: {result.comment}")
+            else:
+                print(f"Exited long position for {name}")
+                self.positions[name].remove(position_to_close)
+
+    def place_short(self, name, quantity, symbol=SYMBOL):
         if name not in self.positions:
             self.positions[name] = []
 
-        # Ensure no existing short position for this model before placing a new one
         if not any(pos['type'] == 'short' for pos in self.positions[name]):
+            # Fetch account information to check for sufficient margin
+            account_info = mt5.account_info()
+            if not account_info:
+                print("Failed to get account information")
+                return
+
+            # Check if there is enough free margin to place the order
+            symbol_info = mt5.symbol_info(symbol)
+            if not symbol_info:
+                print(f"Symbol info could not be retrieved for {symbol}")
+                return
+
+            cost_of_one_lot = symbol_info.trade_contract_size * mt5.symbol_info_tick(symbol).bid
+            if account_info.free_margin < cost_of_one_lot * quantity:
+                print("Insufficient margin to place short order")
+                return
+
             self.positions[name].append({'symbol': symbol, 'quantity': quantity, 'type': 'short'})
-            # TODO: Add the MT5 API call to place a short order here
+            
+            # MT5 API Call to Place a Short Order
+            trade_request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": quantity,
+                "type": mt5.ORDER_TYPE_SELL,
+                "price": mt5.symbol_info_tick(symbol).bid,
+                "sl": 0,  # Stop Loss
+                "tp": 0,  # Take Profit
+                "deviation": 20,
+                "magic": 0,
+                "comment": f"Short order by {name}",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+
+            result = mt5.order_send(trade_request)
+            if result.retcode != mt5.TRADE_RETCODE_DONE:
+                print(f"Failed to place short order: {result.comment}")
+            else:
+                print(f"Short order placed successfully for {name}")
 
     def exit_short(self, name, symbol=SYMBOL):
-        """
-        This method is meant to exit a short order with the brokerage.
-        """
-        # Remove the short position for this model
         if name in self.positions:
-            self.positions[name] = [pos for pos in self.positions[name] if not (pos['symbol'] == symbol and pos['type'] == 'short')]
-            # TODO: Add the MT5 API call to exit a short order here
+            short_positions = [pos for pos in self.positions[name] if pos['symbol'] == symbol and pos['type'] == 'short']
+            if not short_positions:
+                print(f"No short positions found for {name} on {symbol}")
+                return
+
+            position_to_close = short_positions[0]
+
+            trade_request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": position_to_close['quantity'],
+                "type": mt5.ORDER_TYPE_BUY,
+                "price": mt5.symbol_info_tick(symbol).ask,
+                "sl": 0,  # Stop Loss
+                "tp": 0,  # Take Profit
+                "deviation": 20,
+                "magic": 0,
+                "comment": f"Exiting short for {name}",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+
+            result = mt5.order_send(trade_request)
+            if result.retcode != mt5.TRADE_RETCODE_DONE:
+                print(f"Failed to exit short position: {result.comment}")
+            else:
+                print(f"Exited short position for {name}")
+                self.positions[name].remove(position_to_close)
+
 if __name__ == "__main__":
     server = Server()
 
