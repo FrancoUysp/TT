@@ -137,85 +137,106 @@ class Server:
 
     def place_long(self, name, quantity, symbol=SYMBOL):
         self.connect()
+        
         if name not in self.positions:
             self.positions[name] = []
 
-        if not any(pos['type'] == 'long' for pos in self.positions[name]):
-            # Fetch account information to check for sufficient margin
-            account_info = mt5.account_info()
-            if not account_info:
-                print("Failed to get account information")
+        # Check if the symbol is available in Market Watch
+        symbol_info = mt5.symbol_info(symbol)
+        if symbol_info is None:
+            print(f"{symbol} not found, cannot place order")
+            self.close_connection()
+            return
+
+        if not symbol_info.visible:
+            print(f"{symbol} is not visible, trying to switch on")
+            if not mt5.symbol_select(symbol, True):
+                print(f"symbol_select({symbol}) failed, cannot place order")
+                self.close_connection()
+                return
+        
+        # Check if we already have a long position for this symbol
+        for pos in self.positions[name]:
+            if pos['type'] == 'long' and pos['symbol'] == symbol:
+                print(f"Long position for {symbol} by {name} already exists.")
+                self.close_connection()
                 return
 
-            # Check if there is enough free margin to place the order
-            symbol_info = mt5.symbol_info(symbol)
-            if not symbol_info:
-                print(f"Symbol info could not be retrieved for {symbol}")
-                return
+        # Now that we have the symbol, get the account and symbol information
+        account_info = mt5.account_info()
+        if not account_info:
+            print("Failed to get account information")
+            self.close_connection()
+            return
 
-            cost_of_one_lot = symbol_info.trade_contract_size * mt5.symbol_info_tick(symbol).ask
-            if account_info.margin_free < cost_of_one_lot * quantity:
-                print("Insufficient margin to place long order")
-                return
+        # Check for sufficient free margin to place the order
+        cost_of_one_lot = symbol_info.trade_contract_size * mt5.symbol_info_tick(symbol).ask
+        if account_info.margin_free < cost_of_one_lot * quantity:
+            print("Insufficient margin to place long order")
+            self.close_connection()
+            return
 
-            self.positions[name].append({'symbol': symbol, 'quantity': quantity, 'type': 'long'})
-            
-            # MT5 API Call to Place a Long Order
-            filling_type = self.find_filling_mode(symbol, "BUY")
-            trade_request = {
-                "action": mt5.TRADE_ACTION_DEAL,
-                "symbol": symbol,
-                "volume": quantity,
-                "type": mt5.ORDER_TYPE_BUY,
-                "price": mt5.symbol_info_tick(symbol).ask,
-                "deviation": 20,
-                "magic": 0,
-                "comment": f"Long order by {name}",
-                "type_time": mt5.ORDER_TIME_GTC,
-                "type_filling": filling_type
-            }
+        # Prepare the trade request
+        trade_request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": quantity,
+            "type": mt5.ORDER_TYPE_BUY,
+            "price": mt5.symbol_info_tick(symbol).ask,
+            "deviation": 20,
+            "magic": 112009,
+            "comment": f"Long order by {name}",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_IOC,
+        }
 
-            result = mt5.order_send(trade_request)
-            print(result)
-            if result.retcode != mt5.TRADE_RETCODE_DONE:
-                print(f"Failed to place long order: {result.comment}")
-            else:
-                print(f"Long order placed successfully for {name}")
+        # Send the trade request
+        result = mt5.order_send(trade_request)
+        if result is None:
+            print("order_send returned None, error code:", mt5.last_error())
+        elif result.retcode != mt5.TRADE_RETCODE_DONE:
+            print(f"Failed to place long order, retcode={result.retcode}, error code:", mt5.last_error())
+        else:
+            print(f"Long order placed successfully for {name}, ticket={result.order}")
+            self.positions[name].append({'symbol': symbol, 'quantity': quantity, 'type': 'long', 'ticket': result.order})
+
         self.close_connection()
 
     def exit_long(self, name, symbol=SYMBOL):
-
         self.connect()
         if name in self.positions:
-            long_positions = [pos for pos in self.positions[name] if pos['symbol'] == symbol and pos['type'] == 'long']
-            if not long_positions:
-                print(f"No long positions found for {name} on {symbol}")
-                return
+            # Find the position with the corresponding symbol and 'long' type
+            for pos in self.positions[name]:
+                if pos['type'] == 'long' and pos['symbol'] == symbol:
+                    # Get current bid price for the symbol
+                    price = mt5.symbol_info_tick(symbol).bid
+                    position_id = pos['ticket']  # Use the stored ticket number
+                    
+                    trade_request = {
+                        "action": mt5.TRADE_ACTION_DEAL,
+                        "symbol": symbol,
+                        "volume": pos['quantity'],
+                        "type": mt5.ORDER_TYPE_SELL,
+                        "position": position_id,
+                        "price": price,
+                        "deviation": 20,
+                        "magic": 112009,
+                        "comment": f"Exiting long for {name}",
+                        "type_time": mt5.ORDER_TIME_GTC,
+                        "type_filling": mt5.ORDER_FILLING_IOC,
+                    }
 
-            # Assuming you want to close the first long position found
-            position_to_close = long_positions[0]
-
-            filling_type = self.find_filling_mode(symbol, "BUY")
-            trade_request = {
-                "action": mt5.TRADE_ACTION_DEAL,
-                "symbol": symbol,
-                "volume": position_to_close['quantity'],
-                "type": mt5.ORDER_TYPE_SELL,
-                "price": mt5.symbol_info_tick(symbol).bid,
-                "deviation": 20,
-                "magic": 0,
-                "comment": f"Exiting long for {name}",
-                "type_time": mt5.ORDER_TIME_GTC,
-                "type_filling": filling_type
-            }
-
-            result = mt5.order_send(trade_request)
-            if result.retcode != mt5.TRADE_RETCODE_DONE:
-                print(f"Failed to exit long position: {result.comment}")
+                    result = mt5.order_send(trade_request)
+                    if result.retcode != mt5.TRADE_RETCODE_DONE:
+                        print(f"Failed to exit long position: {result.comment}")
+                    else:
+                        print(f"Exited long position for {name}, deal={result.order}")
+                        self.positions[name].remove(pos)
+                        break  # Exit after closing the position
             else:
-                print(f"Exited long position for {name}")
-                self.positions[name].remove(position_to_close)
+                print(f"No long position found for {name} on {symbol}")
         self.close_connection()
+
 
     def place_short(self, name, quantity, symbol):
         self.connect()
@@ -223,48 +244,64 @@ class Server:
         if name not in self.positions:
             self.positions[name] = []
 
-        if not any(pos['type'] == 'short' and pos['symbol'] == symbol for pos in self.positions[name]):
-            account_info = mt5.account_info()
-            if not account_info:
-                print("Failed to get account information")
+        # Check if the symbol is available in Market Watch
+        symbol_info = mt5.symbol_info(symbol)
+        if symbol_info is None:
+            print(f"{symbol} not found, cannot place order")
+            self.close_connection()
+            return
+
+        if not symbol_info.visible:
+            print(f"{symbol} is not visible, trying to switch on")
+            if not mt5.symbol_select(symbol, True):
+                print(f"symbol_select({symbol}) failed, cannot place order")
+                self.close_connection()
+                return
+        
+        # Check if we already have a short position for this symbol
+        for pos in self.positions[name]:
+            if pos['type'] == 'short' and pos['symbol'] == symbol:
+                print(f"Short position for {symbol} by {name} already exists.")
                 self.close_connection()
                 return
 
-            symbol_info = mt5.symbol_info(symbol)
-            if not symbol_info:
-                print(f"Symbol info could not be retrieved for {symbol}")
-                self.close_connection()
-                return
+        # Fetch account information to check for sufficient margin
+        account_info = mt5.account_info()
+        if not account_info:
+            print("Failed to get account information")
+            self.close_connection()
+            return
 
-            cost_of_one_lot = symbol_info.trade_contract_size * mt5.symbol_info_tick(symbol).bid
-            if account_info.margin_free < cost_of_one_lot * quantity:
-                print("Insufficient margin to place short order")
-                self.close_connection()
-                return
+        # Check if there is enough free margin to place the order
+        cost_of_one_lot = symbol_info.trade_contract_size * symbol_info.bid
+        if account_info.margin_free < cost_of_one_lot * quantity:
+            print("Insufficient margin to place short order")
+            self.close_connection()
+            return
 
-            filling_type = self.find_filling_mode(symbol, "SELL")
+        # Prepare the trade request
+        trade_request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": quantity,
+            "type": mt5.ORDER_TYPE_SELL,
+            "price": symbol_info.bid,
+            "deviation": 20,
+            "magic": 112009,
+            "comment": f"Short order by {name}",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_IOC,
+        }
 
-            trade_request = {
-                "action": mt5.TRADE_ACTION_DEAL,
-                "symbol": symbol,
-                "volume": quantity,
-                "type": mt5.ORDER_TYPE_SELL,
-                "price": mt5.symbol_info_tick(symbol).bid,
-                "deviation": 20,
-                "comment": f"Short order by {name}",
-                "type_time": mt5.ORDER_TIME_GTC,
-                "type_filling": filling_type
-            }
-
-            result = mt5.order_send(trade_request)
-            if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
-                error_message = "Failed to place short order"
-                if result:
-                    error_message += f": {result.comment}"
-                print(error_message)
-            else:
-                print(f"Short order placed successfully for {name}")
-                self.positions[name].append({'symbol': symbol, 'quantity': quantity, 'type': 'short'})
+        # Send the trade request
+        result = mt5.order_send(trade_request)
+        if result is None:
+            print("order_send returned None, error code:", mt5.last_error())
+        elif result.retcode != mt5.TRADE_RETCODE_DONE:
+            print(f"Failed to place short order, retcode={result.retcode}, error code:", mt5.last_error())
+        else:
+            print(f"Short order placed successfully for {name}, ticket={result.order}")
+            self.positions[name].append({'symbol': symbol, 'quantity': quantity, 'type': 'short', 'ticket': result.order})
 
         self.close_connection()
 
@@ -272,48 +309,36 @@ class Server:
         self.connect()
 
         if name in self.positions:
-            # Filter for short positions of the specified symbol
-            short_positions = [pos for pos in self.positions[name] if pos['symbol'] == symbol and pos['type'] == 'short']
-            if not short_positions:
-                print(f"No short positions found for {name} on {symbol}")
-                self.close_connection()
-                return
+            # Find the position with the corresponding symbol and 'short' type
+            for pos in self.positions[name]:
+                if pos['type'] == 'short' and pos['symbol'] == symbol:
+                    # Get current ask price for the symbol
+                    price = mt5.symbol_info_tick(symbol).ask
+                    position_id = pos['ticket']  # Use the stored ticket number
 
-            # Assuming closing the first short position found
-            position_to_close = short_positions[0]
+                    trade_request = {
+                        "action": mt5.TRADE_ACTION_DEAL,
+                        "symbol": symbol,
+                        "volume": pos['quantity'],
+                        "type": mt5.ORDER_TYPE_BUY,
+                        "position": position_id,
+                        "price": price,
+                        "deviation": 20,
+                        "magic": 112009,
+                        "comment": f"Exiting short for {name}",
+                        "type_time": mt5.ORDER_TIME_GTC,
+                        "type_filling": mt5.ORDER_FILLING_IOC,
+                    }
 
-            symbol_info = mt5.symbol_info(symbol)
-            if symbol_info is None:
-                print(f"Symbol info could not be retrieved for {symbol}")
-                self.close_connection()
-                return
-
-            filling_type = self.find_filling_mode(symbol, "SELL")
-
-            # MT5 API Call to Close a Short Position
-            trade_request = {
-                "action": mt5.TRADE_ACTION_DEAL,
-                "symbol": symbol,
-                "volume": position_to_close['quantity'],
-                "type": mt5.ORDER_TYPE_BUY,  # Buying back the short position
-                "price": mt5.symbol_info_tick(symbol).ask,  # Current ask price
-                "deviation": 20,
-                "comment": f"Exiting short for {name}",
-                "type_time": mt5.ORDER_TIME_GTC,  # Good Till Cancelled
-                "type_filling": filling_type,  # Filling type based on symbol settings
-            }
-
-            result = mt5.order_send(trade_request)
-            if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
-                error_message = "Failed to exit short position"
-                if result:
-                    error_message += f": {result.comment}"
-                print(error_message)
+                    result = mt5.order_send(trade_request)
+                    if result.retcode != mt5.TRADE_RETCODE_DONE:
+                        print(f"Failed to exit short position: {result.comment}")
+                    else:
+                        print(f"Exited short position for {name}, deal={result.order}")
+                        self.positions[name].remove(pos)
+                        break  # Exit after closing the position
             else:
-                print(f"Exited short position for {name}")
-                # Removing the position from the list
-                self.positions[name].remove(position_to_close)
-
+                print(f"No short position found for {name} on {symbol}")
         self.close_connection()
 
     def find_filling_mode(self, symbol=SYMBOL, order_type="BUY"):
@@ -339,7 +364,7 @@ class Server:
             
             if result.comment == "Done":
                 break
-            return i
+        return i
 
     def connect(self):
         mt5.initialize()

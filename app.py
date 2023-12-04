@@ -54,12 +54,6 @@ class MainServer:
                         print("fetching new minute data")
                         last_minute = datetime.datetime.now().minute
                         self.server.buffer_df = self.server.append_to_buffer_and_update_main()
-                        if not in_trade:    
-                            self.server.place_short("test", 1, "NAS100")
-                            in_trade = True
-                        else:
-                            self.server.exit_short("test", "NAS100")
-                            sys.exit()
                         if self.models:
                             for model in self.models.values():
                                 processed_data = self.preprocessor.transform_for_pred(
