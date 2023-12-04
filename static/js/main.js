@@ -193,9 +193,8 @@ function plotCandlestickChart(candleData, tradeHistory) {
     }
   };
 
-  const config = { responsive: true }; // Add responsiveness
+  Plotly.newPlot('graph-container', [candleTrace, longEntryTrace, longExitTrace, shortEntryTrace, shortExitTrace, tradeLines], layout);
 
-  Plotly.react('graph-container', [candleTrace, longEntryTrace, longExitTrace, shortEntryTrace, shortExitTrace, tradeLines], layout, config);
 }
 
 function fetchAndDisplayModels() {
