@@ -56,12 +56,10 @@ class Server:
         new_data['datetime'] = pd.to_datetime(new_data['time'], unit='s')
         new_data = new_data[['datetime', 'open', 'high', 'low', 'close']]
 
-        # Check if new_data is the same as the last processed data
         if self.last_processed_data is not None and new_data.equals(self.last_processed_data):
             self.close_connection()
             return self.buffer_df
 
-        # Update last_processed_data
 
         file = os.path.join("data", "main.csv")
         main_df = pd.read_csv(file, parse_dates=['datetime'])
@@ -71,12 +69,10 @@ class Server:
             new_data.to_csv(file, mode='a', header=False, index=False)
             self.last_processed_data = new_data
 
-        # Read the last BUFFER_SIZE rows from main.csv to update the buffer
         buffer_df = pd.read_csv(file, parse_dates=['datetime']).tail(self.BUFFER_SIZE)
 
         self.close_connection()
         return buffer_df
-
 
 
     def update_main(self):
