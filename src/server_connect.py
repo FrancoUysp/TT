@@ -161,19 +161,18 @@ class Server:
             self.positions[name].append({'symbol': symbol, 'quantity': quantity, 'type': 'long'})
             
             # MT5 API Call to Place a Long Order
+            filling_type = self.find_filling_mode(symbol, "BUY")
             trade_request = {
                 "action": mt5.TRADE_ACTION_DEAL,
                 "symbol": symbol,
                 "volume": quantity,
                 "type": mt5.ORDER_TYPE_BUY,
                 "price": mt5.symbol_info_tick(symbol).ask,
-                "sl": 0,  # Stop Loss
-                "tp": 0,  # Take Profit
                 "deviation": 20,
                 "magic": 0,
                 "comment": f"Long order by {name}",
                 "type_time": mt5.ORDER_TIME_GTC,
-                "type_filling": mt5.ORDER_FILLING_IOC,
+                "type_filling": filling_type
             }
 
             result = mt5.order_send(trade_request)
@@ -196,20 +195,18 @@ class Server:
             # Assuming you want to close the first long position found
             position_to_close = long_positions[0]
 
-            # MT5 API Call to Exit a Long Order
+            filling_type = self.find_filling_mode(symbol, "BUY")
             trade_request = {
                 "action": mt5.TRADE_ACTION_DEAL,
                 "symbol": symbol,
                 "volume": position_to_close['quantity'],
                 "type": mt5.ORDER_TYPE_SELL,
                 "price": mt5.symbol_info_tick(symbol).bid,
-                "sl": 0,  # Stop Loss
-                "tp": 0,  # Take Profit
                 "deviation": 20,
                 "magic": 0,
                 "comment": f"Exiting long for {name}",
                 "type_time": mt5.ORDER_TIME_GTC,
-                "type_filling": mt5.ORDER_FILLING_IOC,
+                "type_filling": filling_type
             }
 
             result = mt5.order_send(trade_request)
@@ -245,7 +242,7 @@ class Server:
                 self.close_connection()
                 return
 
-            filling_type = mt5.symbol_info(symbol).filling_mode
+            filling_type = self.find_filling_mode(symbol, "SELL")
 
             trade_request = {
                 "action": mt5.TRADE_ACTION_DEAL,
@@ -253,8 +250,6 @@ class Server:
                 "volume": quantity,
                 "type": mt5.ORDER_TYPE_SELL,
                 "price": mt5.symbol_info_tick(symbol).bid,
-                "sl": 0,
-                "tp": 0,
                 "deviation": 20,
                 "comment": f"Short order by {name}",
                 "type_time": mt5.ORDER_TIME_GTC,
@@ -293,7 +288,7 @@ class Server:
                 self.close_connection()
                 return
 
-            filling_type = symbol_info.filling_mode
+            filling_type = self.find_filling_mode(symbol, "SELL")
 
             # MT5 API Call to Close a Short Position
             trade_request = {
@@ -321,7 +316,31 @@ class Server:
 
         self.close_connection()
 
-        
+    def find_filling_mode(self, symbol=SYMBOL, order_type="BUY"):
+        if order_type == "BUY":
+            price = mt5.symbol_info_tick(symbol).ask
+            order = mt5.ORDER_TYPE_BUY
+        elif order_type == "SELL":
+            price = mt5.symbol_info_tick(symbol).bid
+            order = mt5.ORDER_TYPE_SELL
+        else: return -1
+
+        for i in range(2):
+            request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": mt5.symbol_info(symbol).volume_min,
+            "type": order,  
+            "price": price,
+            "type_filling": i,
+            "type_time": mt5.ORDER_TIME_GTC}
+
+            result = mt5.order_check(request)
+            
+            if result.comment == "Done":
+                break
+            return i
+
     def connect(self):
         mt5.initialize()
         authorized = mt5.login(self.LOGIN, password=self.PASSWORD, server=self.SERVER)
