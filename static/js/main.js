@@ -49,6 +49,39 @@ function fetchAndDisplayCandlestickData() {
 }
 
 function plotCandlestickChart(candleData, tradeHistory) {
+
+  const tradeLines = [];
+  tradeHistory.forEach((trade, index) => {
+    const dateTime = new Date(trade.date).toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    // Add entry signal and line
+    if (trade.long_entry_price || trade.short_entry_price) {
+      const entryPrice = trade.long_entry_price || trade.short_entry_price;
+      const entryColor = trade.long_entry_price ? 'green' : 'red';
+      // Add a line trace for this trade
+      tradeLines.push({
+        x: [dateTime, dateTime], // start and end time are the same at first
+        y: [entryPrice, candleData[candleData.length - 1].close], // start at entry price, end at last close price
+        mode: 'lines',
+        line: { color: entryColor },
+        name: `Trade Line ${index + 1}`
+      });
+    }
+    // Remove exit signal and associated line
+    if (trade.long_exit_price || trade.short_exit_price) {
+      // Find the line associated with this trade and remove it
+      const exitIndex = tradeLines.findIndex(line => line.name === `Trade Line ${index + 1}`);
+      if (exitIndex !== -1) {
+        tradeLines.splice(exitIndex, 1); // remove the line
+      }
+    }
+  });
+
   const candleTrace = {
     x: candleData.map(row => new Date(row.datetime).toLocaleString('en-US', {
       month: 'numeric',
@@ -160,7 +193,7 @@ function plotCandlestickChart(candleData, tradeHistory) {
     }
   };
 
-  Plotly.newPlot('graph-container', [candleTrace, longEntryTrace, longExitTrace, shortEntryTrace, shortExitTrace], layout);
+  Plotly.newPlot('graph-container', [candleTrace, longEntryTrace, longExitTrace, shortEntryTrace, shortExitTrace, tradeLines], layout);
 }
 
 function fetchAndDisplayModels() {
