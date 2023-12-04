@@ -11,6 +11,7 @@ from src.utils import *
 import time
 from threading import Lock
 from flask_cors import CORS
+from src.server_connect import Server
 
 HOST_IP = "0.0.0.0"
 HOST_PORT = 8000
@@ -18,11 +19,9 @@ UPDATE_INTERVAL = 5
 
 app = Flask(__name__)
 CORS(app)
-
 data_lock = Lock()
 
 # Assuming the Server class is in the src.server_connect module
-from src.server_connect import Server
 
 class MainServer:
     def __init__(self):
@@ -72,6 +71,7 @@ class MainServer:
             time_to_sleep = 60 - datetime.datetime.now().second
             time.sleep(time_to_sleep)
 
+main_server = MainServer()
 
 @app.route("/get_data", methods=["GET"])
 def get_data():
@@ -323,5 +323,4 @@ def index():
 
 
 if __name__ == "__main__":
-    main_server = MainServer()
     app.run(host=HOST_IP, port=HOST_PORT )
