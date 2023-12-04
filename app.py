@@ -68,7 +68,7 @@ class MainServer:
                 except Exception as e:
                     print(f"An error occurred: {e}")
 
-            time_to_sleep = 60 - datetime.datetime.now().second
+            time_to_sleep = 61 - datetime.datetime.now().second
             time.sleep(time_to_sleep)
 
 main_server = MainServer()
