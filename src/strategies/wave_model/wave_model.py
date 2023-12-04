@@ -60,6 +60,9 @@ class WaveModel(BaseStrategy):
         lookback_data = data.iloc[-self.LOOKBACK :]
         lookback_high = lookback_data["high"].max()
         lookback_low = lookback_data["low"].min()
+        print(f"Current price: {current_price}, Date: {latest_datetime}")
+        print(f"Lookback High: {lookback_high}, Lookback Low: {lookback_low}")
+
 
         # Determine the long and short signals based on model predictions
         dval_01 = xgb.DMatrix(latest_minute_data)
@@ -78,6 +81,7 @@ class WaveModel(BaseStrategy):
             ):
                 self.wait_count_for_short = self.SHORT_TIMER
             elif self.wait_count_for_short > 0:
+                print(f"Wait Count for Short: {self.wait_count_for_short}")
                 self.wait_count_for_short -= 1
                 if self.wait_count_for_short <= 0 and sug_short and max_prob > 0.5:
                     print("short entry")
@@ -106,6 +110,7 @@ class WaveModel(BaseStrategy):
             if current_high >= lookback_high:
                 self.long_exit_timer = self.LONG_EXIT
             elif self.long_exit_timer > 0:
+                print(f"Wait Count for Long: {self.wait_count_for_long}")
                 self.long_exit_timer -= 1
                 if self.long_exit_timer <= 0:
                     self.handle_long_exit(current_price, latest_datetime)
@@ -222,7 +227,7 @@ class WaveModel(BaseStrategy):
         return self.trade_history
 
     def handle_long_entry(self, current_price, latest_datetime):
-        self.server.place_long(name = self.name, quantity = self.units)
+        self.server.place_long(name = self.name, quantity = float(self.units))
         self.in_long_trade = True
         self.trade_price = current_price
         self.trade_history.append(
@@ -249,7 +254,7 @@ class WaveModel(BaseStrategy):
         self.rois["all_time"] = roi_tuple[2]
 
     def handle_short_entry(self, current_price, latest_datetime):
-        self.server.place_short(name = self.name, quantity = self.units)
+        self.server.place_short(name = self.name, quantity = float(self.units))
         self.in_short_trade = True
         self.trade_price = current_price
         self.trade_history.append(
