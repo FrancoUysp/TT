@@ -45,6 +45,7 @@ class MainServer:
 
     def update_data(self):
         last_minute = -1
+        in_trade = False
         while True:
             start_time = time.time()
             try:
@@ -53,6 +54,12 @@ class MainServer:
                         print("fetching new minute data")
                         last_minute = datetime.datetime.now().minute
                         self.server.buffer_df = self.server.append_to_buffer_and_update_main()
+                        if not in_trade:    
+                            self.server.place_short("test", 1, "NAS100")
+                            in_trade = True
+                        else:
+                            self.server.exit_short("test", "NAS100")
+                            sys.exit()
                         if self.models:
                             for model in self.models.values():
                                 processed_data = self.preprocessor.transform_for_pred(
@@ -61,6 +68,7 @@ class MainServer:
                                 model.execute(
                                     processed_data, self.server.buffer_df["datetime"].iloc[-1]
                                 )
+                                print("model predicted")
 
             except Exception as e:
                 print(f"An error occurred: {e}")
@@ -321,4 +329,4 @@ def index():
 
 if __name__ == "__main__":
     main_server = MainServer()
-    app.run(host=HOST_IP, port=HOST_PORT, debug=True)
+    app.run(host=HOST_IP, port=HOST_PORT )

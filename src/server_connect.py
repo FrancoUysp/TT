@@ -21,7 +21,6 @@ class Server:
         self.last_processed_data = None  # New attribute to track the last processed data
         self.buffer_df = self.create_buffer_queue()
         self.positions = {}  
-        self.init_connection()
 
     def create_buffer_queue(self):
         """
@@ -41,9 +40,7 @@ class Server:
         Fetch the data from the previous minute from the brokerage
         and update the main.csv file. Then, read the last rows of main.csv as the buffer.
         """
-        if not self.init_connection():
-            print("Error initializing MetaTrader 5")
-            return self.buffer_df
+        self.connect()
 
         server_time = datetime.now() + timedelta(hours=2)
         server_time = server_time.replace(microsecond=0, second=0) - timedelta(minutes=1)
@@ -83,10 +80,8 @@ class Server:
 
 
     def update_main(self):
-        if not self.init_connection():
-            print("Error initializing MetaTrader 5")
-            return self.buffer_df
 
+        self.connect()
         file = os.path.join("data", "main.csv")  
         main_df = read_df(file)
 
@@ -128,20 +123,8 @@ class Server:
         df = df[df['datetime'] > last_entry_time]
 
         df.to_csv(file, mode='a', header=False, index=False)
+        self.close_connection()
         print("Main.csv updated successfully!")
-
-    def init_connection(self):
-        """
-        Initialize the connection with the brokerage using the predefined credentials.
-        """
-        try:
-            if not mt5.initialize(login=self.LOGIN, password=self.PASSWORD, server=self.SERVER):
-                print("Error initializing MetaTrader 5: ", mt5.last_error())
-                return False
-            return True
-        except Exception as e:
-            print("Exception occurred during MT5 initialization: ", e)
-            return False
 
     def close_connection(self):
         """
@@ -153,6 +136,7 @@ class Server:
             print(e)
 
     def place_long(self, name, quantity, symbol=SYMBOL):
+        self.connect()
         if name not in self.positions:
             self.positions[name] = []
 
@@ -170,7 +154,7 @@ class Server:
                 return
 
             cost_of_one_lot = symbol_info.trade_contract_size * mt5.symbol_info_tick(symbol).ask
-            if account_info.free_margin < cost_of_one_lot * quantity:
+            if account_info.margin_free < cost_of_one_lot * quantity:
                 print("Insufficient margin to place long order")
                 return
 
@@ -193,12 +177,16 @@ class Server:
             }
 
             result = mt5.order_send(trade_request)
+            print(result)
             if result.retcode != mt5.TRADE_RETCODE_DONE:
                 print(f"Failed to place long order: {result.comment}")
             else:
                 print(f"Long order placed successfully for {name}")
+        self.close_connection()
 
     def exit_long(self, name, symbol=SYMBOL):
+
+        self.connect()
         if name in self.positions:
             long_positions = [pos for pos in self.positions[name] if pos['symbol'] == symbol and pos['type'] == 'long']
             if not long_positions:
@@ -230,83 +218,118 @@ class Server:
             else:
                 print(f"Exited long position for {name}")
                 self.positions[name].remove(position_to_close)
+        self.close_connection()
 
-    def place_short(self, name, quantity, symbol=SYMBOL):
+    def place_short(self, name, quantity, symbol):
+        self.connect()
+
         if name not in self.positions:
             self.positions[name] = []
 
-        if not any(pos['type'] == 'short' for pos in self.positions[name]):
-            # Fetch account information to check for sufficient margin
+        if not any(pos['type'] == 'short' and pos['symbol'] == symbol for pos in self.positions[name]):
             account_info = mt5.account_info()
             if not account_info:
                 print("Failed to get account information")
+                self.close_connection()
                 return
 
-            # Check if there is enough free margin to place the order
             symbol_info = mt5.symbol_info(symbol)
             if not symbol_info:
                 print(f"Symbol info could not be retrieved for {symbol}")
+                self.close_connection()
                 return
 
             cost_of_one_lot = symbol_info.trade_contract_size * mt5.symbol_info_tick(symbol).bid
-            if account_info.free_margin < cost_of_one_lot * quantity:
+            if account_info.margin_free < cost_of_one_lot * quantity:
                 print("Insufficient margin to place short order")
+                self.close_connection()
                 return
 
-            self.positions[name].append({'symbol': symbol, 'quantity': quantity, 'type': 'short'})
-            
-            # MT5 API Call to Place a Short Order
+            filling_type = mt5.symbol_info(symbol).filling_mode
+
             trade_request = {
                 "action": mt5.TRADE_ACTION_DEAL,
                 "symbol": symbol,
                 "volume": quantity,
                 "type": mt5.ORDER_TYPE_SELL,
                 "price": mt5.symbol_info_tick(symbol).bid,
-                "sl": 0,  # Stop Loss
-                "tp": 0,  # Take Profit
+                "sl": 0,
+                "tp": 0,
                 "deviation": 20,
-                "magic": 0,
                 "comment": f"Short order by {name}",
                 "type_time": mt5.ORDER_TIME_GTC,
-                "type_filling": mt5.ORDER_FILLING_IOC,
+                "type_filling": filling_type
             }
 
             result = mt5.order_send(trade_request)
-            if result.retcode != mt5.TRADE_RETCODE_DONE:
-                print(f"Failed to place short order: {result.comment}")
+            if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+                error_message = "Failed to place short order"
+                if result:
+                    error_message += f": {result.comment}"
+                print(error_message)
             else:
                 print(f"Short order placed successfully for {name}")
+                self.positions[name].append({'symbol': symbol, 'quantity': quantity, 'type': 'short'})
 
-    def exit_short(self, name, symbol=SYMBOL):
+        self.close_connection()
+
+    def exit_short(self, name, symbol): 
+        self.connect()
+
         if name in self.positions:
+            # Filter for short positions of the specified symbol
             short_positions = [pos for pos in self.positions[name] if pos['symbol'] == symbol and pos['type'] == 'short']
             if not short_positions:
                 print(f"No short positions found for {name} on {symbol}")
+                self.close_connection()
                 return
 
+            # Assuming closing the first short position found
             position_to_close = short_positions[0]
 
+            symbol_info = mt5.symbol_info(symbol)
+            if symbol_info is None:
+                print(f"Symbol info could not be retrieved for {symbol}")
+                self.close_connection()
+                return
+
+            filling_type = symbol_info.filling_mode
+
+            # MT5 API Call to Close a Short Position
             trade_request = {
                 "action": mt5.TRADE_ACTION_DEAL,
                 "symbol": symbol,
                 "volume": position_to_close['quantity'],
-                "type": mt5.ORDER_TYPE_BUY,
-                "price": mt5.symbol_info_tick(symbol).ask,
-                "sl": 0,  # Stop Loss
-                "tp": 0,  # Take Profit
+                "type": mt5.ORDER_TYPE_BUY,  # Buying back the short position
+                "price": mt5.symbol_info_tick(symbol).ask,  # Current ask price
                 "deviation": 20,
-                "magic": 0,
                 "comment": f"Exiting short for {name}",
-                "type_time": mt5.ORDER_TIME_GTC,
-                "type_filling": mt5.ORDER_FILLING_IOC,
+                "type_time": mt5.ORDER_TIME_GTC,  # Good Till Cancelled
+                "type_filling": filling_type,  # Filling type based on symbol settings
             }
 
             result = mt5.order_send(trade_request)
-            if result.retcode != mt5.TRADE_RETCODE_DONE:
-                print(f"Failed to exit short position: {result.comment}")
+            if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+                error_message = "Failed to exit short position"
+                if result:
+                    error_message += f": {result.comment}"
+                print(error_message)
             else:
                 print(f"Exited short position for {name}")
+                # Removing the position from the list
                 self.positions[name].remove(position_to_close)
+
+        self.close_connection()
+
+        
+    def connect(self):
+        mt5.initialize()
+        authorized = mt5.login(self.LOGIN, password=self.PASSWORD, server=self.SERVER)
+
+        if authorized:
+            print(f"Connected: Connecting to MT5 Client at {self.SERVER}")
+        else:
+            print("Failed to connect, error code: {}".format(mt5.last_error()))
 
 if __name__ == "__main__":
     server = Server()
