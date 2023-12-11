@@ -265,6 +265,7 @@ class Server:
                 "type_filling": filling_mode,
             }
 
+        print(trade_request)
         if trade_request != None:
             result = mt5.order_send(trade_request)
             if result.retcode == mt5.TRADE_RETCODE_DONE:
