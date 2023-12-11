@@ -53,25 +53,6 @@ function plotCandlestickChart(candleData, tradeHistory) {
   const currentCloseTime = new Date(candleData[candleData.length - 1].datetime); // Assuming datetime is a valid date string
   const currentClosePrice = candleData[candleData.length - 1].close;
 
-  tradeHistory.forEach((trade, index) => {
-    // Convert trade date to Date object for comparison
-    const tradeTime = new Date(trade.date);
-
-    // Check if tradeTime is within the range of candleData dates
-    if (candleData.some(candle => new Date(candle.datetime).getTime() === tradeTime.getTime())) {
-      const entryPrice = trade.long_entry_price || trade.short_entry_price;
-      const entryColor = trade.long_entry_price ? 'green' : 'red';
-
-      // Construct the line trace
-      tradeLines.push({
-        x: [tradeTime.toISOString(), currentCloseTime.toISOString()],
-        y: [entryPrice, currentClosePrice],
-        mode: 'lines',
-        line: { color: entryColor, dash: 'dash' },
-        name: `Trade Line ${index + 1}`
-      });
-    }
-  });
 
   const candleTrace = {
     x: candleData.map(row => new Date(row.datetime).toLocaleString('en-US', {
@@ -150,6 +131,30 @@ function plotCandlestickChart(candleData, tradeHistory) {
     marker: { size: 10, color: 'orange' },
     name: 'Short Exit'
   };
+
+  tradeHistory.forEach((trade, index) => {
+    if (trade.long_entry_price && trade.long_exit_price) {
+      // Draw a line between entry and exit for long positions
+      tradeLines.push({
+        x: [trade.long_entry_datetime, trade.long_exit_datetime],
+        y: [trade.long_entry_price, trade.long_exit_price],
+        mode: 'lines',
+        line: { color: 'green', dash: 'dash' },
+        name: `Long Trade Line ${index}`
+      });
+    }
+
+    if (trade.short_entry_price && trade.short_exit_price) {
+      // Draw a line between entry and exit for short positions
+      tradeLines.push({
+        x: [trade.short_entry_datetime, trade.short_exit_datetime],
+        y: [trade.short_entry_price, trade.short_exit_price],
+        mode: 'lines',
+        line: { color: 'red', dash: 'dash' },
+        name: `Short Trade Line ${index}`
+      });
+    }
+  });
 
   const layout = {
     title: 'Candlestick Chart',
