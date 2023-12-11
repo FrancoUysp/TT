@@ -75,7 +75,6 @@ class Server:
             self.last_processed_data = new_data
 
         self.close_connection()
-        return self.buffer_df
 
     def update_main(self):
         self.connect()

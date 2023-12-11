@@ -54,7 +54,7 @@ class MainServer:
 
                 try:
                     with data_lock:
-                        self.server.buffer_df = self.server.append_to_buffer_and_update_main()
+                        self.server.append_to_buffer_and_update_main()
                         processed_data = self.preprocessor.transform_for_pred(
                             self.server.buffer_df.copy()
                         )
