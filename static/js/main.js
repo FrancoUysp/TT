@@ -1,4 +1,4 @@
-const UPDATETIME = 5000;
+const UPDATETIME = 10000;
 
 // Initialization and Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
