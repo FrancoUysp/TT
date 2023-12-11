@@ -43,6 +43,7 @@ class MainServer:
 
     def update_data(self):
         last_minute = datetime.datetime.now().minute
+        i = 0 
         while True:
             current_time = datetime.datetime.now()
             current_minute = current_time.minute
@@ -54,19 +55,28 @@ class MainServer:
                 try:
                     with data_lock:
                         self.server.buffer_df = self.server.append_to_buffer_and_update_main()
+                        processed_data = self.preprocessor.transform_for_pred(
+                            self.server.buffer_df.copy()
+                        )
                         if self.models:
                             for model in self.models.values():
-                                processed_data = self.preprocessor.transform_for_pred(
-                                    self.server.buffer_df.copy()
-                                )
-                                model.execute(
-                                    processed_data, self.server.buffer_df["datetime"].iloc[-1]
-                                )
+                                # model.execute(
+                                #     processed_data, self.server.buffer_df["datetime"].iloc[-1]
+                                # )
+                                if i == 0:
+                                    model.handle_short_trade(processed_data, self.server.buffer_df["datetime"].iloc[-1])
+                                if i == 1:
+                                    model.handle_long_trade(processed_data, self.server.buffer_df["datetime"].iloc[-1])
+                                if i == 2:
+                                    model.handle_short_exit(processed_data, self.server.buffer_df["datetime"].iloc[-1])
+                                if i == 4:
+                                    model.handle_long_exit(processed_data, self.server.buffer_df["datetime"].iloc[-1])
+                                    sys.exit()
                                 print("Model predicted")
                 except Exception as e:
                     print(f"An error occurred: {e}")
 
-            time_to_sleep = 61 - datetime.datetime.now().second
+            time_to_sleep = 60.5 - datetime.datetime.now().second
             time.sleep(time_to_sleep)
 
 main_server = MainServer()
