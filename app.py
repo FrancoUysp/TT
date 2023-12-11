@@ -73,6 +73,7 @@ class MainServer:
                                     model.handle_long_exit(processed_data, self.server.buffer_df["datetime"].iloc[-1])
                                     sys.exit()
                                 print("Model predicted")
+                                i += 1
                 except Exception as e:
                     print(f"An error occurred: {e}")
 
