@@ -66,11 +66,11 @@ class MainServer:
                                 if i == 0:
                                     model.handle_long_entry(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
                                 if i == 1:
-                                    model.handle_short_entry(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
-                                if i == 2:
-                                    model.handle_short_exit(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
-                                if i == 4:
                                     model.handle_long_exit(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
+                                if i == 2:
+                                    model.handle_short_entry(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
+                                if i == 4:
+                                    model.handle_short_exit(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
                                     sys.exit()
                                 print("Model predicted")
                                 i += 1
