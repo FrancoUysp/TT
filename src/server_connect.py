@@ -234,7 +234,7 @@ class Server:
         self.close_connection()
 
 
-    def place_short(self, name, quantity, symbol):
+    def place_short(self, name, quantity, symbol=SYMBOL):
         self.connect()
 
         if name not in self.positions:
@@ -301,7 +301,7 @@ class Server:
 
         self.close_connection()
 
-    def exit_short(self, name, symbol): 
+    def exit_short(self, name, symbol=SYMBOL): 
         self.connect()
 
         if name in self.positions:
