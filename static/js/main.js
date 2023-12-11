@@ -132,23 +132,38 @@ function plotCandlestickChart(candleData, tradeHistory) {
     name: 'Short Exit'
   };
 
+  const shortExitTrace = {
+    x: shortExitSignals.map(signal => signal.x),
+    y: shortExitSignals.map(signal => signal.y),
+    mode: 'markers',
+    marker: { size: 10, color: 'orange' },
+    name: 'Short Exit'
+  };
+
   tradeHistory.forEach((trade, index) => {
-    if (trade.long_entry_price && trade.long_exit_price) {
-      // Draw a line between entry and exit for long positions
+    // Convert the pandas Timestamp to JavaScript Date object, then to ISO string
+    const entryDateTime = new Date(trade.date).toISOString();
+
+    // Check if we have both entry and exit prices for a long trade
+    if (trade.long_entry_price && tradeHistory[index + 1] && tradeHistory[index + 1].long_exit_price) {
+      const exitDateTime = new Date(tradeHistory[index + 1].date).toISOString();
+
       tradeLines.push({
-        x: [trade.long_entry_datetime, trade.long_exit_datetime],
-        y: [trade.long_entry_price, trade.long_exit_price],
+        x: [entryDateTime, exitDateTime],
+        y: [trade.long_entry_price, tradeHistory[index + 1].long_exit_price],
         mode: 'lines',
         line: { color: 'green', dash: 'dash' },
         name: `Long Trade Line ${index}`
       });
     }
 
-    if (trade.short_entry_price && trade.short_exit_price) {
-      // Draw a line between entry and exit for short positions
+    // Check if we have both entry and exit prices for a short trade
+    if (trade.short_entry_price && tradeHistory[index + 1] && tradeHistory[index + 1].short_exit_price) {
+      const exitDateTime = new Date(tradeHistory[index + 1].date).toISOString();
+
       tradeLines.push({
-        x: [trade.short_entry_datetime, trade.short_exit_datetime],
-        y: [trade.short_entry_price, trade.short_exit_price],
+        x: [entryDateTime, exitDateTime],
+        y: [trade.short_entry_price, tradeHistory[index + 1].short_exit_price],
         mode: 'lines',
         line: { color: 'red', dash: 'dash' },
         name: `Short Trade Line ${index}`
@@ -190,6 +205,43 @@ function plotCandlestickChart(candleData, tradeHistory) {
   };
 
   Plotly.newPlot('graph-container', [candleTrace, longEntryTrace, longExitTrace, shortEntryTrace, shortExitTrace, tradeLines], layout);
+
+}
+
+const layout = {
+  title: 'Candlestick Chart',
+  autosize: true,
+  margin: { // Updated margins
+    l: 50,
+    r: 50,
+    b: 150, // Increase bottom margin to accommodate rotated labels
+    t: 50,
+    pad: 4
+  },
+  height: window.innerHeight - document.getElementById('title-container').offsetHeight - 20,
+  xaxis: {
+    autorange: true,
+    title: 'Time',
+    rangeslider: { visible: false }, // Range slider can help focus on specific intervals
+    tickformat: '%H:%M', // Simpler format
+    tickangle: -45, // Rotate labels to avoid overlap
+    automargin: true,
+    nticks: 20, // Limit the number of ticks to prevent crowding
+    gridcolor: 'rgba(255, 255, 255, 0.1)'
+  },
+  yaxis: {
+    autorange: true,
+    title: 'Price',
+    gridcolor: 'rgba(255, 255, 255, 0.1)'
+  },
+  paper_bgcolor: '#000',
+  plot_bgcolor: '#000',
+  font: {
+    color: '#ffffff'
+  }
+};
+
+Plotly.newPlot('graph-container', [candleTrace, longEntryTrace, longExitTrace, shortEntryTrace, shortExitTrace, tradeLines], layout);
 
 }
 
