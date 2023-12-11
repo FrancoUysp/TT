@@ -147,6 +147,7 @@ class Server:
         symbol=SYMBOL,
     ):
         self.connect()
+        quantity = float(quantity)
         cost_of_one_lot = None
         trade_request = None
 

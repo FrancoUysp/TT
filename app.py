@@ -55,11 +55,9 @@ class MainServer:
                 try:
                     with data_lock:
                         self.server.buffer_df = self.server.append_to_buffer_and_update_main()
-                        print("thisfat")
                         processed_data = self.preprocessor.transform_for_pred(
                             self.server.buffer_df.copy()
                         )
-                        print("sakldfjlsakjfdthisfat")
                         if self.models:
                             for model in self.models.values():
                                 # model.execute(
