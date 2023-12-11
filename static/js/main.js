@@ -50,27 +50,26 @@ function fetchAndDisplayCandlestickData() {
 
 function plotCandlestickChart(candleData, tradeHistory) {
   const tradeLines = [];
-  const currentCloseTime = candleData[candleData.length - 1].datetime;
+  const currentCloseTime = new Date(candleData[candleData.length - 1].datetime); // Assuming datetime is a valid date string
   const currentClosePrice = candleData[candleData.length - 1].close;
 
   tradeHistory.forEach((trade, index) => {
-    // Assuming trade.date is in the same timezone/format as candleData.datetime
-    const tradeTime = new Date(trade.date).toISOString();
+    // Convert trade date to Date object for comparison
+    const tradeTime = new Date(trade.date);
 
-    if (trade.long_entry_price || trade.short_entry_price) {
+    // Check if tradeTime is within the range of candleData dates
+    if (candleData.some(candle => new Date(candle.datetime).getTime() === tradeTime.getTime())) {
       const entryPrice = trade.long_entry_price || trade.short_entry_price;
       const entryColor = trade.long_entry_price ? 'green' : 'red';
 
-      // Only draw the line if the trade's datetime is within the current candleData range
-      if (candleData.some(candle => candle.datetime === tradeTime)) {
-        tradeLines.push({
-          x: [tradeTime, currentCloseTime], // Use ISO string for datetime
-          y: [entryPrice, currentClosePrice],
-          mode: 'lines',
-          line: { color: entryColor, dash: 'dash' },
-          name: `Trade Line ${index + 1}`
-        });
-      }
+      // Construct the line trace
+      tradeLines.push({
+        x: [tradeTime.toISOString(), currentCloseTime.toISOString()],
+        y: [entryPrice, currentClosePrice],
+        mode: 'lines',
+        line: { color: entryColor, dash: 'dash' },
+        name: `Trade Line ${index + 1}`
+      });
     }
   });
 
