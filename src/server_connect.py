@@ -169,13 +169,6 @@ class Server:
                 self.close_connection()
                 return
 
-        # just ensuring on active trade per model
-        for pos in self.positions[id]:
-            if pos["type"] == "long" and pos["symbol"] == symbol:
-                print(f"Long position for {symbol} by {id} already exists.")
-                self.close_connection()
-                return
-
         # obtain account info
         account_info = mt5.account_info()
         if not account_info:
