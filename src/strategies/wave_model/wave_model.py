@@ -1,6 +1,7 @@
 import datetime
 import xgboost as xgb
 from ..base_strategy import BaseStrategy
+import uuid
 
 
 class WaveModel(BaseStrategy):
@@ -33,6 +34,7 @@ class WaveModel(BaseStrategy):
         self.rois["daily"] = 0
         self.rois["monthly"] = 0
         self.rois["all_time"] = 0
+        self.id = str(uuid.uuid4())
 
         self.latest_date = None
         self.current_price = 0
@@ -280,3 +282,6 @@ class WaveModel(BaseStrategy):
         self.rois["monthly"] = roi_tuple[1]
         self.rois["all_time"] = roi_tuple[2]
         
+    def get_id(self):
+        return self.id
+

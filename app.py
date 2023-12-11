@@ -15,7 +15,6 @@ from src.server_connect import Server
 
 HOST_IP = "0.0.0.0"
 HOST_PORT = 8000
-UPDATE_INTERVAL = 5
 
 app = Flask(__name__)
 CORS(app)
@@ -48,7 +47,6 @@ class MainServer:
             current_time = datetime.datetime.now()
             current_minute = current_time.minute
 
-            # Check if a new minute has started
             if last_minute != current_minute:
                 last_minute = current_minute  # Update the last_minute to the current
                 print("Fetching new minute data...")
