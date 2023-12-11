@@ -266,6 +266,7 @@ class Server:
             }
 
         if trade_request != None:
+            print("volume:", trade_request["volume"])
             result = mt5.order_send(trade_request)
             if result is None:
                 print("order_send failed, error code:", mt5.last_error())
