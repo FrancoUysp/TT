@@ -55,7 +55,6 @@ class MainServer:
                 try:
                     with data_lock:
                         self.server.append_to_buffer_and_update_main()
-                        print(self.server.buffer_df)
                         processed_data = self.preprocessor.transform_for_pred(
                             self.server.buffer_df.copy()
                         )
@@ -97,7 +96,9 @@ def get_data():
         if model_name and model_name in main_server.models:
             model = main_server.models[model_name]
             trade_hist = model.get_trade_history()
+            print(trade_hist)
             response_data["trade_history"] = trade_hist
+        print(response_data)
 
         return jsonify(response_data)
 
