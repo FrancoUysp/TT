@@ -55,20 +55,19 @@ class Server:
         new_data['datetime'] = pd.to_datetime(new_data['time'], unit='s')
         new_data = new_data[['datetime', 'open', 'high', 'low', 'close']]
 
-        # Update buffer_df in memory
+        # Check if buffer_df is initialized and if new data is different from last processed data
         if self.buffer_df is not None and not new_data.equals(self.last_processed_data):
-            self.buffer_df = self.buffer_df.append(new_data, ignore_index=True)
-            self.buffer_df = self.buffer_df.tail(self.BUFFER_SIZE)  # Keep only the last BUFFER_SIZE rows
+            # Append new data to the buffer and keep the last BUFFER_SIZE rows
+            self.buffer_df = pd.concat([self.buffer_df, new_data]).tail(self.BUFFER_SIZE)
 
             # Append new data to main.csv file
-            file = os.path.join("data", "main.csv")
-            new_data.to_csv(file, mode='a', header=False, index=False)
+            file_path = os.path.join("data", "main.csv")
+            new_data.to_csv(file_path, mode='a', header=False, index=False)
 
             self.last_processed_data = new_data
 
         self.close_connection()
         return self.buffer_df
-
 
     def update_main(self):
 
