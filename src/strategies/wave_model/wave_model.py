@@ -1,12 +1,10 @@
 import datetime
 import xgboost as xgb
-from ..base_strategy import BaseStrategy
 import uuid
 
 
-class WaveModel(BaseStrategy):
+class WaveModel():
     def __init__(self, model_01, model_23, params, server):
-        super().__init__(model_01, params)
         self.model_23 = model_23
         self.model_01 = model_01
         self.server = server

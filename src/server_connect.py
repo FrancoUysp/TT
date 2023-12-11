@@ -136,10 +136,10 @@ class Server:
 
     def place_trade(
         self,
-        model,
+        id,
         quantity,
-        buy,
-        sell,
+        buy=False,
+        sell=False,
         pct_tp=0,
         pct_sl=0,
         comment="",
@@ -159,8 +159,8 @@ class Server:
             print("Error finding filling mode")
             return
 
-        if model.get_id() not in self.positions:
-            self.positions[model.get_id()] = []
+        if id not in self.positions:
+            self.positions[id] = []
 
         symbol_info = mt5.symbol_info(symbol)
         if symbol_info is None:
@@ -265,16 +265,23 @@ class Server:
                 "type_filling": filling_mode,
             }
 
-        #place and record the model id with the associated trade
         if trade_request != None:
             result = mt5.order_send(trade_request)
             if result.retcode == mt5.TRADE_RETCODE_DONE:
-                
-
+                print(
+                    f"Trade request executed successfully, position id={result.order}"
+                )
+                self.positions[id].append(
+                    {
+                        "type": "long" if buy else "short",
+                        "symbol": symbol,
+                        "position": result.order,
+                    }
+                )
+                self.close_connection()
+                return result.order
 
         self.close_connection()
-        #     self.positions[id].append(
-        #     
 
 
     def find_filling_mode(self, symbol=SYMBOL, order_type="BUY"):
