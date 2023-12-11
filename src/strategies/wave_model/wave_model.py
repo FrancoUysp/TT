@@ -35,6 +35,7 @@ class WaveModel(BaseStrategy):
         self.rois["monthly"] = 0
         self.rois["all_time"] = 0
         self.id = str(uuid.uuid4())
+        self.trade_id
 
         self.latest_date = None
         self.current_price = 0
@@ -64,7 +65,6 @@ class WaveModel(BaseStrategy):
         lookback_low = lookback_data["low"].min()
         print(f"Current price: {current_price}, Date: {latest_datetime}")
         print(f"Lookback High: {lookback_high}, Lookback Low: {lookback_low}")
-
 
         # Determine the long and short signals based on model predictions
         dval_01 = xgb.DMatrix(latest_minute_data)
@@ -119,7 +119,6 @@ class WaveModel(BaseStrategy):
 
         self.previous_high = lookback_high
         self.previous_low = lookback_low
-
 
     def exit_trade(self):
         if self.in_long_trade:
@@ -197,7 +196,9 @@ class WaveModel(BaseStrategy):
                 exit_trade = self.trade_history[i + 1]
                 if "short_exit_price" in exit_trade:
                     investment = trade["short_entry_price"] * abs(trade["units"])
-                    profit = (trade["short_entry_price"] - exit_trade["short_exit_price"]) * abs(trade["units"])
+                    profit = (
+                        trade["short_entry_price"] - exit_trade["short_exit_price"]
+                    ) * abs(trade["units"])
                     total_profit += profit
                     total_investment += investment
 
@@ -205,17 +206,21 @@ class WaveModel(BaseStrategy):
                 exit_trade = self.trade_history[i + 1]
                 if "long_exit_price" in exit_trade:
                     investment = trade["long_entry_price"] * abs(trade["units"])
-                    profit = (exit_trade["long_exit_price"] - trade["long_entry_price"]) * trade["units"]
+                    profit = (
+                        exit_trade["long_exit_price"] - trade["long_entry_price"]
+                    ) * trade["units"]
                     total_profit += profit
                     total_investment += investment
 
             else:
-                continue  
+                continue
 
             daily_roi[date] = (daily_roi.get(date, 0) + profit) / investment * 100
             monthly_roi[month] = (monthly_roi.get(month, 0) + profit) / investment * 100
 
-        alltime_roi = (total_profit / total_investment) * 100 if total_investment > 0 else 0
+        alltime_roi = (
+            (total_profit / total_investment) * 100 if total_investment > 0 else 0
+        )
         return daily_roi, monthly_roi, alltime_roi
 
     def get_roi(self):
@@ -229,7 +234,12 @@ class WaveModel(BaseStrategy):
         return self.trade_history
 
     def handle_long_entry(self, current_price, latest_datetime):
-        self.server.place_long(name = self.name, quantity = float(self.units))
+        self.trade_id = self.server.place_trade(
+            id=self.id,
+            quantity=self.units,
+            buy=True,
+            sell=False,
+        )
         self.in_long_trade = True
         self.trade_price = current_price
         self.trade_history.append(
@@ -241,7 +251,13 @@ class WaveModel(BaseStrategy):
         )
 
     def handle_long_exit(self, current_price, latest_datetime):
-        self.server.exit_long(name = self.name)
+        self.server.place_trade(
+            id=self.id,
+            quantity=self.units,
+            buy=False,
+            sell=True,
+            id_position=self.trade_id,
+        )
         self.in_long_trade = False
         self.trade_history.append(
             {
@@ -256,7 +272,12 @@ class WaveModel(BaseStrategy):
         self.rois["all_time"] = roi_tuple[2]
 
     def handle_short_entry(self, current_price, latest_datetime):
-        self.server.place_short(name = self.name, quantity = float(self.units))
+        self.trade_id = self.server.place_trade(
+            id=self.id,
+            quantity=self.units,
+            buy=False,
+            sell=True,
+        )
         self.in_short_trade = True
         self.trade_price = current_price
         self.trade_history.append(
@@ -268,20 +289,25 @@ class WaveModel(BaseStrategy):
         )
 
     def handle_short_exit(self, current_price, latest_datetime):
-        self.server.exit_short(name = self.name)
+        self.server.place_trade(
+            id=self.id,
+            quantity=self.units,
+            buy=True,
+            sell=False,
+            id_position=self.trade_id,
+        )
         self.in_short_trade = False
         self.trade_history.append(
             {
-            "short_exit_price": current_price,
-            "units": self.units,
-            "date": latest_datetime,
+                "short_exit_price": current_price,
+                "units": self.units,
+                "date": latest_datetime,
             }
         )
         roi_tuple = self.calculate_roi()
         self.rois["daily"] = roi_tuple[0]
         self.rois["monthly"] = roi_tuple[1]
         self.rois["all_time"] = roi_tuple[2]
-        
+
     def get_id(self):
         return self.id
-
