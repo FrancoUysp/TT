@@ -64,9 +64,9 @@ class MainServer:
                                 #     processed_data, self.server.buffer_df["datetime"].iloc[-1]
                                 # )
                                 if i == 0:
-                                    model.handle_short_trade(processed_data, self.server.buffer_df["datetime"].iloc[-1])
+                                    model.handle_long_entry(processed_data, self.server.buffer_df["datetime"].iloc[-1])
                                 if i == 1:
-                                    model.handle_long_trade(processed_data, self.server.buffer_df["datetime"].iloc[-1])
+                                    model.handle_short_entry(processed_data, self.server.buffer_df["datetime"].iloc[-1])
                                 if i == 2:
                                     model.handle_short_exit(processed_data, self.server.buffer_df["datetime"].iloc[-1])
                                 if i == 4:
