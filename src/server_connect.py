@@ -44,13 +44,9 @@ class Server:
         self.connect()
 
         server_time = datetime.now() + timedelta(hours=2)
-        server_time = server_time.replace(microsecond=0, second=0) - timedelta(
-            minutes=1
-        )
+        server_time = server_time.replace(microsecond=0, second=0) - timedelta(minutes=1)
 
-        rates = mt5.copy_rates_from(
-            self.SYMBOL, self.TIMEFRAME, int(server_time.timestamp()), 1
-        )
+        rates = mt5.copy_rates_from(self.SYMBOL, self.TIMEFRAME, int(server_time.timestamp()), 1)
 
         if rates is None or len(rates) == 0:
             print("Error fetching new data from MT5:", mt5.last_error())
@@ -64,9 +60,7 @@ class Server:
         # Check if buffer_df is initialized and if new data is different from last processed data
         if self.buffer_df is not None and not new_data.equals(self.last_processed_data):
             # Append new data to the buffer and keep the last BUFFER_SIZE rows
-            self.buffer_df = pd.concat([self.buffer_df, new_data]).tail(
-                self.BUFFER_SIZE
-            )
+            self.buffer_df = pd.concat([self.buffer_df, new_data]).tail(self.BUFFER_SIZE).reset_index(drop=True)
 
             # Append new data to main.csv file
             file_path = os.path.join("data", "main.csv")
