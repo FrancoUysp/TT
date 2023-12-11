@@ -142,7 +142,7 @@ class Server:
         sell=False,
         pct_tp=0,
         pct_sl=0,
-        comment="",
+        comment="NA",
         id_position=None,
         symbol=SYMBOL,
     ):
