@@ -64,13 +64,13 @@ class MainServer:
                                 #     processed_data, self.server.buffer_df["datetime"].iloc[-1]
                                 # )
                                 if i == 0:
-                                    model.handle_long_entry(processed_data, self.server.buffer_df["datetime"].iloc[-1])
+                                    model.handle_long_entry(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
                                 if i == 1:
-                                    model.handle_short_entry(processed_data, self.server.buffer_df["datetime"].iloc[-1])
+                                    model.handle_short_entry(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
                                 if i == 2:
-                                    model.handle_short_exit(processed_data, self.server.buffer_df["datetime"].iloc[-1])
+                                    model.handle_short_exit(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
                                 if i == 4:
-                                    model.handle_long_exit(processed_data, self.server.buffer_df["datetime"].iloc[-1])
+                                    model.handle_long_exit(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
                                     sys.exit()
                                 print("Model predicted")
                                 i += 1
@@ -87,7 +87,6 @@ def get_data():
     with data_lock:
         model_name = request.args.get("name")
         response_data = {"candle_data": [], "trade_history": []}
-
         if main_server.server.buffer_df is not None:
             response_data["candle_data"] = main_server.server.buffer_df[
                 ["datetime", "open", "high", "low", "close"]
@@ -96,7 +95,6 @@ def get_data():
         if model_name and model_name in main_server.models:
             model = main_server.models[model_name]
             trade_hist = model.get_trade_history()
-            print(trade_hist)
             response_data["trade_history"] = trade_hist
 
         return jsonify(response_data)
