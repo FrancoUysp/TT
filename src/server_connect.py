@@ -136,8 +136,8 @@ class Server:
 
     def place_trade(
         self,
-        id,
-        quantity,
+        id:int,
+        quantity:float,
         buy=False,
         sell=False,
         pct_tp=0,
@@ -266,7 +266,6 @@ class Server:
             }
 
         if trade_request != None:
-            print("volume:", trade_request["volume"])
             result = mt5.order_send(trade_request)
             if result is None:
                 print("order_send failed, error code:", mt5.last_error())
