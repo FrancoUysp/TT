@@ -69,7 +69,7 @@ class MainServer:
                                     model.handle_long_exit(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
                                 if i == 2:
                                     model.handle_short_entry(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
-                                if i == 4:
+                                if i == 3:
                                     model.handle_short_exit(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
                                     sys.exit()
                                 print("Model predicted")
@@ -95,6 +95,7 @@ def get_data():
         if model_name and model_name in main_server.models:
             model = main_server.models[model_name]
             trade_hist = model.get_trade_history()
+            print(trade_hist)
             response_data["trade_history"] = trade_hist
 
         return jsonify(response_data)
