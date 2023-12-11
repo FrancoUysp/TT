@@ -98,7 +98,6 @@ def get_data():
             trade_hist = model.get_trade_history()
             print(trade_hist)
             response_data["trade_history"] = trade_hist
-        print(response_data)
 
         return jsonify(response_data)
 
