@@ -49,40 +49,34 @@ function fetchAndDisplayCandlestickData() {
 }
 
 function plotCandlestickChart(candleData, tradeHistory) {
-
-  const tradeLines = [];
   const currentClosePrice = candleData[candleData.length - 1].close;
-  let latestEntrySignal = null;
-  let latestEntrySignalIndex = -1;
 
-  // Process trade history to find the latest entry signal
-  tradeHistory.forEach((trade, index) => {
-    if (trade.long_entry_price || trade.short_entry_price) {
-      latestEntrySignal = trade;
-      latestEntrySignalIndex = index;
-    }
-  });
-
-  // Create trade lines only if the latest entry signal is still on the chart
-  if (latestEntrySignal) {
-    const entryDateTime = new Date(latestEntrySignal.date).toLocaleString('en-US', {
+  // Process trade history to create trade lines
+  const tradeLines = tradeHistory.reduce((lines, trade, index) => {
+    const dateTime = new Date(trade.date).toLocaleString('en-US', {
       month: 'numeric',
       day: 'numeric',
       year: '2-digit',
       hour: '2-digit',
       minute: '2-digit'
     });
-    const entryPrice = latestEntrySignal.long_entry_price || latestEntrySignal.short_entry_price;
-    const entryColor = latestEntrySignal.long_entry_price ? 'green' : 'red';
 
-    tradeLines.push({
-      x: [entryDateTime, candleData[candleData.length - 1].datetime],
-      y: [entryPrice, currentClosePrice],
-      mode: 'lines',
-      line: { color: entryColor, dash: 'dash' },
-      name: `Trade Line ${latestEntrySignalIndex + 1}`
-    });
-  }
+    if (trade.long_entry_price || trade.short_entry_price) {
+      const entryPrice = trade.long_entry_price || trade.short_entry_price;
+      const entryColor = trade.long_entry_price ? 'green' : 'red';
+
+      // Add a line trace for this trade
+      lines.push({
+        x: [dateTime, candleData[candleData.length - 1].datetime],
+        y: [entryPrice, currentClosePrice],
+        mode: 'lines',
+        line: { color: entryColor, dash: 'dash' },
+        name: `Trade Line ${index + 1}`
+      });
+    }
+
+    return lines;
+  }, []);
 
   const candleTrace = {
     x: candleData.map(row => new Date(row.datetime).toLocaleString('en-US', {
