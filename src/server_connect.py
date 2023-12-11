@@ -206,7 +206,7 @@ class Server:
             }
 
         # here we exit a buy position
-        if buy and id_position != None:
+        if sell and id_position != None:
             trade_request = {
                 "action": mt5.TRADE_ACTION_DEAL,
                 "symbol": symbol,
@@ -237,7 +237,7 @@ class Server:
             }
 
         # here we exit a short
-        if sell and id_position != None:
+        if buy and id_position != None:
             trade_request = {
                 "action": mt5.TRADE_ACTION_DEAL,
                 "symbol": symbol,
