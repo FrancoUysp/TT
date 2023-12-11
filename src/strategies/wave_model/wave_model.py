@@ -33,7 +33,7 @@ class WaveModel():
         self.rois["monthly"] = 0
         self.rois["all_time"] = 0
         self.id = str(uuid.uuid4())
-        self.trade_id
+        self.trade_id = None
 
         self.latest_date = None
         self.current_price = 0
