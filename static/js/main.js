@@ -51,36 +51,38 @@ function fetchAndDisplayCandlestickData() {
 function plotCandlestickChart(candleData, tradeHistory) {
 
   const tradeLines = [];
+  const currentClosePrice = candleData[candleData.length - 1].close;
+  let latestEntrySignal = null;
+  let latestEntrySignalIndex = -1;
+
+  // Process trade history to find the latest entry signal
   tradeHistory.forEach((trade, index) => {
-    const dateTime = new Date(trade.date).toLocaleString('en-US', {
+    if (trade.long_entry_price || trade.short_entry_price) {
+      latestEntrySignal = trade;
+      latestEntrySignalIndex = index;
+    }
+  });
+
+  // Create trade lines only if the latest entry signal is still on the chart
+  if (latestEntrySignal) {
+    const entryDateTime = new Date(latestEntrySignal.date).toLocaleString('en-US', {
       month: 'numeric',
       day: 'numeric',
       year: '2-digit',
       hour: '2-digit',
       minute: '2-digit'
     });
-    // Add entry signal and line
-    if (trade.long_entry_price || trade.short_entry_price) {
-      const entryPrice = trade.long_entry_price || trade.short_entry_price;
-      const entryColor = trade.long_entry_price ? 'green' : 'red';
-      // Add a line trace for this trade
-      tradeLines.push({
-        x: [dateTime, dateTime], // start and end time are the same at first
-        y: [entryPrice, candleData[candleData.length - 1].close], // start at entry price, end at last close price
-        mode: 'lines',
-        line: { color: entryColor },
-        name: `Trade Line ${index + 1}`
-      });
-    }
-    // Remove exit signal and associated line
-    if (trade.long_exit_price || trade.short_exit_price) {
-      // Find the line associated with this trade and remove it
-      const exitIndex = tradeLines.findIndex(line => line.name === `Trade Line ${index + 1}`);
-      if (exitIndex !== -1) {
-        tradeLines.splice(exitIndex, 1); // remove the line
-      }
-    }
-  });
+    const entryPrice = latestEntrySignal.long_entry_price || latestEntrySignal.short_entry_price;
+    const entryColor = latestEntrySignal.long_entry_price ? 'green' : 'red';
+
+    tradeLines.push({
+      x: [entryDateTime, candleData[candleData.length - 1].datetime],
+      y: [entryPrice, currentClosePrice],
+      mode: 'lines',
+      line: { color: entryColor, dash: 'dash' },
+      name: `Trade Line ${latestEntrySignalIndex + 1}`
+    });
+  }
 
   const candleTrace = {
     x: candleData.map(row => new Date(row.datetime).toLocaleString('en-US', {
