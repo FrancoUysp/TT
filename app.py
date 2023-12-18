@@ -45,7 +45,6 @@ class MainServer:
 
     def update_data(self):
         last_minute = datetime.datetime.now().minute
-        i = 0
         while True:
             current_time = datetime.datetime.now()
             current_minute = current_time.minute
@@ -56,19 +55,15 @@ class MainServer:
 
                 try:
                     with data_lock:
-                        print("here")
                         self.server.append_to_buffer_and_update_main()
-                        print("here2")
                         processed_data = self.preprocessor.transform_for_pred(
                             self.server.buffer_df.copy() 
                         )
-                        print("here3")
                         if self.models:
                             for model in self.models.values():
                                 model.execute(
                                     processed_data, self.server.buffer_df["datetime"].iloc[-1]
                                 )
-                        print("here4")
                 except Exception as e:
                     print(f"An error occurred: {e}")
 

@@ -59,15 +59,12 @@ class WaveModel():
         lookback_data = data.iloc[-self.LOOKBACK :]
         lookback_high = lookback_data["high"].max()
         lookback_low = lookback_data["low"].min()
-        print(f"Current price: {current_price}, Date: {latest_datetime}")
-        print(f"Lookback High: {lookback_high}, Lookback Low: {lookback_low}")
 
         # Determine the long and short signals based on model predictions
         dval_01 = xgb.DMatrix(latest_minute_data)
         dval_23 = xgb.DMatrix(latest_minute_data)
         prob_01 = self.model_01.predict(dval_01)[0]
         prob_23 = self.model_23.predict(dval_23)[0]
-        print(f"prob long: {prob_01}\t prob short: {prob_23}")
         max_prob = max(prob_01, prob_23)
         sug_long = prob_01 > prob_23
         sug_short = not sug_long
