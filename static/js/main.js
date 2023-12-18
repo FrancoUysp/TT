@@ -288,7 +288,7 @@ function collectParams(containerId, isUpdate = false) {
     // If the parameter is 'name', allow it to be non-numeric
     if (paramName.toLowerCase() === 'name') {
       params[paramName] = value;
-    } else if (isNaN(value) || Number(value) < 0) {
+    } else if (isNaN(value)) {
       input.classList.add('invalid-input');
       allValid = false;
     } else {
