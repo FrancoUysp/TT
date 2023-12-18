@@ -112,7 +112,6 @@ def get_models():
     models_info = []
     for model_name in os.listdir(models_dir):
         model_path = os.path.join(models_dir, model_name)
-        print(model_path)
         if os.path.isdir(model_path):
             params_file_path = os.path.join(model_path, "parameters.json")
             try:
@@ -120,6 +119,7 @@ def get_models():
                     params = json.load(params_file)
                     strategy_params = params.get("strategy_params", {})
                     models_info.append({"name": model_name, "params": strategy_params})
+                    print(models_info)
             except FileNotFoundError:
                 print(f"parameters.json not found for model {model_name}")
                 continue
