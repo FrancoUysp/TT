@@ -65,6 +65,7 @@ class MainServer:
                                 # model.execute(
                                 #     processed_data, self.server.buffer_df["datetime"].iloc[-1]
                                 # )
+                                print("model: ", model.get_name(), "i: ", i)
                                 if i == 0:
                                     model.handle_long_entry(
                                         self.server.buffer_df["close"].iloc[-1],
