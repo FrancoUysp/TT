@@ -34,17 +34,20 @@ class TrendFollower():
         self.accumulative_sum_neg = 0
         self.prev_pos = 0
         self.prev_neg = 0
+        self.prev_price = 0
 
     def execute(self, data, latest_datetime):
         self.latest_date = latest_datetime
         latest_minute_data = data.iloc[-1:]
         current_price = latest_minute_data["close"].item()
 
-        prev_minute_data = data.iloc[-2:]
-        prev_price = prev_minute_data["close"].item()
+        if self.prev_price == 0:
+            self.prev_price = current_price
+            return
+
         self.current_price = current_price
 
-        price_change = current_price - prev_price
+        price_change = current_price - self.prev_price
         self.prev_neg = self.accumulative_sum_neg
         self.prev_pos = self.accumulative_sum_pos
 
@@ -76,6 +79,8 @@ class TrendFollower():
                 self.handle_long_exit(current_price, latest_datetime)
             if not self.in_trade:  # Enter short trade
                 self.handle_short_entry(current_price, latest_datetime)
+
+        self.prev_price = current_price
 
     def exit_trade(self):
         if self.in_trade == False:
