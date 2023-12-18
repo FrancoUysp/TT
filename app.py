@@ -2,8 +2,7 @@ from flask import Flask, jsonify, request, render_template
 import datetime
 import sys
 import pickle
-import os
-import json
+import os import json
 import threading
 from src.preprocess import DataPreprocessor
 from src.strategies.wave_model.wave_model import WaveModel
@@ -65,14 +64,16 @@ class MainServer:
                                 # )
                                 if i == 0:
                                     model.handle_long_entry(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
+                                    print(f"model: {model.get_name()} entered a long")
                                 if i == 1:
                                     model.handle_long_exit(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
+                                    print(f"model: {model.get_name()} exited a long")
                                 if i == 2:
                                     model.handle_short_entry(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
+                                    print(f"model: {model.get_name()} entered a short")
                                 if i == 3:
                                     model.handle_short_exit(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
-                                    sys.exit()
-                                print("Model predicted")
+                                    print(f"model: {model.get_name()} exited a short")
                                 i += 1
                 except Exception as e:
                     print(f"An error occurred: {e}")

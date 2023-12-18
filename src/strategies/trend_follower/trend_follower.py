@@ -3,27 +3,16 @@ import xgboost as xgb
 import uuid
 
 
-class WaveModel():
-    def __init__(self, model_01, model_23, params, server):
-        self.model_23 = model_23
-        self.model_01 = model_01
+class TrendFollower():
+    def __init__(self, params, server):
         self.server = server
 
-        self.trade_price = 0
+        self.SHORT_THRESHOLD = params.get("SHORT_THRESHOLD", -83)
+        self.LONG_THRESHOLD = params.get("LONG_THRESHOLD", 41)
 
-        self.LOOKBACK = params.get("LOOKBACK", 180)
-        self.LONG_TIMER = params.get("LONG_TIMER", 1)
-        self.SHORT_EXIT = params.get("SHORT_EXIT", 1)
-        self.SHORT_TIMER = params.get("SHORT_TIMER", 1)
-        self.LONG_EXIT = params.get("LONG_EXIT", 1)
-        self.LONG_DIFF = params.get("LONG_DIFF", 40)
-        self.SHORT_DIFF = params.get("SHORT_DIFF", 20)
-        self.name = params.get("name", "Wave Model")
+        self.name = params.get("name", "Trend Follower")
 
-        self.previous_high = -float("inf")
-        self.previous_low = float("inf")
-
-        self.type = "Wave Model"
+        self.type = "Trend Follower"
         self.units = 1
         self.trade_history = []
         self.rois = dict()
@@ -36,93 +25,70 @@ class WaveModel():
         self.latest_date = None
         self.current_price = 0
 
-        self.wait_count_for_short = 0
-        self.wait_count_for_long = 0
-        self.short_exit_timer = 0
-        self.long_exit_timer = 0
-
-        self.in_short_trade = False
-        self.in_long_trade = False
+        self.trade_price = 0
+        self.in_trade = False
+        self.trade_type = None 
+        self.sum_bull = 0
+        self.sum_bear = 0
+        self.accumulative_sum_pos = 0
+        self.accumulative_sum_neg = 0
+        self.prev_pos = 0
+        self.prev_neg = 0
 
     def execute(self, data, latest_datetime):
-        # Get the latest minute data
         self.latest_date = latest_datetime
-
         latest_minute_data = data.iloc[-1:]
         current_price = latest_minute_data["close"].item()
+
+        prev_minute_data = data.iloc[-2:]
+        prev_price = prev_minute_data["close"].item()
         self.current_price = current_price
 
-        current_low = latest_minute_data["low"].item()
-        current_high = latest_minute_data["high"].item()
+        price_change = current_price - prev_price
+        self.prev_neg = self.accumulative_sum_neg
+        self.prev_pos = self.accumulative_sum_pos
 
-        # Calculate high and low from the lookback period
-        lookback_data = data.iloc[-self.LOOKBACK :]
-        lookback_high = lookback_data["high"].max()
-        lookback_low = lookback_data["low"].min()
-        print(f"Current price: {current_price}, Date: {latest_datetime}")
-        print(f"Lookback High: {lookback_high}, Lookback Low: {lookback_low}")
+        if price_change > 0:
+            self.accumulative_sum_pos += price_change
+            self.accumulative_sum_neg = 0
+        elif price_change < 0:
+            self.accumulative_sum_neg += price_change
+            self.accumulative_sum_pos = 0
 
-        # Determine the long and short signals based on model predictions
-        dval_01 = xgb.DMatrix(latest_minute_data)
-        dval_23 = xgb.DMatrix(latest_minute_data)
-        prob_01 = self.model_01.predict(dval_01)[0]
-        prob_23 = self.model_23.predict(dval_23)[0]
-        print(f"prob long: {prob_01}\t prob short: {prob_23}")
-        max_prob = max(prob_01, prob_23)
-        sug_long = prob_01 > prob_23
-        sug_short = not sug_long
-        if not self.in_long_trade and not self.in_short_trade:
-            if (
-                lookback_high > self.previous_high
-                and (lookback_high - self.previous_low) >= self.SHORT_DIFF
-            ):
-                self.wait_count_for_short = self.SHORT_TIMER
-            elif self.wait_count_for_short > 0:
-                print(f"Wait Count for Short: {self.wait_count_for_short}")
-                self.wait_count_for_short -= 1
-                if self.wait_count_for_short <= 0 and sug_short and max_prob > 0.5:
-                    print("short entry")
-                    self.handle_short_entry(current_price, latest_datetime)
-        elif self.in_short_trade:
-            if current_low <= lookback_low:
-                self.short_exit_timer = self.SHORT_EXIT
-            elif self.short_exit_timer > 0:
-                self.short_exit_timer -= 1
-                if self.short_exit_timer <= 0:
-                    self.handle_short_exit(current_price, latest_datetime)
+        if self.prev_pos > 0 and self.accumulative_sum_pos == 0:
+            self.sum_bull = self.prev_pos
+        else:
+            self.sum_bull = 0
+            
+        if self.prev_neg < 0 and self.accumulative_sum_neg == 0:
+            self.sum_bear = self.prev_neg
+        else: 
+            self.sum_bear = 0
 
-        # Execute trading logic for LONG trades
-        if not self.in_long_trade and not self.in_short_trade:
-            if (
-                lookback_low < self.previous_low
-                and (self.previous_high - lookback_low) >= self.LONG_DIFF
-            ):
-                self.wait_count_for_long = self.LONG_TIMER
-            elif self.wait_count_for_long > 0:
-                self.wait_count_for_long -= 1
-                if self.wait_count_for_long <= 0 and sug_long and max_prob > 0.5:
-                    self.handle_long_entry(current_price, latest_datetime)
-        elif self.in_long_trade:
-            # Check for LONG exit condition
-            if current_high >= lookback_high:
-                self.long_exit_timer = self.LONG_EXIT
-            elif self.long_exit_timer > 0:
-                print(f"Wait Count for Long: {self.wait_count_for_long}")
-                self.long_exit_timer -= 1
-                if self.long_exit_timer <= 0:
-                    self.handle_long_exit(current_price, latest_datetime)
+        if self.sum_bull > self.LONG_THRESHOLD:
+            if self.in_trade and self.trade_type == 0:  # Exit short trade
+                self.handle_short_exit(current_price, latest_datetime)
+            if not self.in_trade:  # Enter long trade
+                self.handle_long_entry(current_price, latest_datetime)
 
-        self.previous_high = lookback_high
-        self.previous_low = lookback_low
+        elif self.sum_bear < self.SHORT_THRESHOLD:
+            if self.in_trade and self.trade_type == 1:  # Exit long trade
+                self.handle_long_exit(current_price, latest_datetime)
+            if not self.in_trade:  # Enter short trade
+                self.handle_short_entry(current_price, latest_datetime)
 
     def exit_trade(self):
-        if self.in_long_trade:
-            self.handle_long_exit(self.current_price, self.latest_date)
-        elif self.in_short_trade:
+        if self.in_trade == False:
+            return
+        if self.trade_type == 0:
             self.handle_short_exit(self.current_price, self.latest_date)
+            return
+        if self.trade_type == 1:
+            self.handle_long_exit(self.current_price, self.latest_date)
+            return
 
     def is_in_trade(self):
-        return self.in_long_trade or self.in_short_trade
+        return self.in_trade
 
     def get_name(self):
         return self.name
@@ -138,13 +104,8 @@ class WaveModel():
 
     def get_params(self):
         params = {
-            "LOOKBACK": self.LOOKBACK,
-            "LONG_TIMER": self.LONG_TIMER,
-            "SHORT_EXIT": self.SHORT_EXIT,
-            "SHORT_TIMER": self.SHORT_TIMER,
-            "LONG_EXIT": self.LONG_EXIT,
-            "LONG_DIFF": self.LONG_DIFF,
-            "SHORT_DIFF": self.SHORT_DIFF,
+            "SHORT_THRESHOLD": self.SHORT_THRESHOLD,
+            "LONG_THRESHOLD": self.LONG_THRESHOLD,
             "name": self.name,
             "units": self.units,
         }
@@ -152,25 +113,15 @@ class WaveModel():
 
     def set_params(self, params):
         if self.is_in_trade() == False:
-            self.LOOKBACK = params.get("LOOKBACK", self.LOOKBACK)
-            self.LONG_TIMER = params.get("LONG_TIMER", self.LONG_TIMER)
-            self.SHORT_EXIT = params.get("SHORT_EXIT", self.SHORT_EXIT)
-            self.SHORT_TIMER = params.get("SHORT_TIMER", self.SHORT_TIMER)
-            self.LONG_EXIT = params.get("LONG_EXIT", self.LONG_EXIT)
-            self.LONG_DIFF = params.get("LONG_DIFF", self.LONG_DIFF)
-            self.SHORT_DIFF = params.get("SHORT_DIFF", self.SHORT_DIFF)
+            self.SHORT_THRESHOLD = params.get("SHORT_THRESHOLD", self.SHORT_THRESHOLD)
+            self.LONG_THRESHOLD = params.get("LONG_THRESHOLD", self.LONG_THRESHOLD)
             self.name = params.get("name", self.name)
             self.units = params.get("units", self.units)
 
     def print_params(self):
         print_string = f"""
-        LOOKBACK: {self.LOOKBACK}
-        LONG_TIMER: {self.LONG_TIMER}   
-        SHORT_EXIT: {self.SHORT_EXIT}
-        SHORT_TIMER: {self.SHORT_TIMER}
-        LONG_EXIT: {self.LONG_EXIT}
-        LONG_DIFF: {self.LONG_DIFF}
-        SHORT_DIFF: {self.SHORT_DIFF}
+        SHORT_THRESHOLD: {self.SHORT_THRESHOLD}
+        LONG_THRESHOLD: {self.LONG_THRESHOLD}
         name: {self.name}
         units: {self.units}
         """
@@ -237,8 +188,9 @@ class WaveModel():
             buy=True,
             sell=False,
         )
-        self.in_long_trade = True
+        self.trade_type = 1
         self.trade_price = current_price
+        self.in_trade = True
         self.trade_history.append(
             {
                 "long_entry_price": current_price,
@@ -255,7 +207,7 @@ class WaveModel():
             sell=True,
             id_position=self.trade_id,
         )
-        self.in_long_trade = False
+        self.in_trade = False
         self.trade_history.append(
             {
                 "long_exit_price": current_price,
@@ -275,8 +227,9 @@ class WaveModel():
             buy=False,
             sell=True,
         )
-        self.in_short_trade = True
+        self.trade_type = 0
         self.trade_price = current_price
+        self.in_trade = True
         self.trade_history.append(
             {
                 "short_entry_price": current_price,
@@ -293,7 +246,7 @@ class WaveModel():
             sell=False,
             id_position=self.trade_id,
         )
-        self.in_short_trade = False
+        self.in_trade = False
         self.trade_history.append(
             {
                 "short_exit_price": current_price,
@@ -308,3 +261,4 @@ class WaveModel():
 
     def get_id(self):
         return self.id
+
