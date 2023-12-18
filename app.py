@@ -58,39 +58,13 @@ class MainServer:
                     with data_lock:
                         self.server.append_to_buffer_and_update_main()
                         processed_data = self.preprocessor.transform_for_pred(
-                            self.server.buffer_df.copy()
+                            self.server.buffer_df.copy() 
                         )
                         if self.models:
                             for model in self.models.values():
-                                # model.execute(
-                                #     processed_data, self.server.buffer_df["datetime"].iloc[-1]
-                                # )
-                                print("model: ", model.get_name(), "i: ", i)
-                                if i == 0:
-                                    model.handle_long_entry(
-                                        self.server.buffer_df["close"].iloc[-1],
-                                        self.server.buffer_df["datetime"].iloc[-1],
-                                    )
-                                    print(f"model: {model.get_name()} entered a long")
-                                if i == 1:
-                                    model.handle_long_exit(
-                                        self.server.buffer_df["close"].iloc[-1],
-                                        self.server.buffer_df["datetime"].iloc[-1],
-                                    )
-                                    print(f"model: {model.get_name()} exited a long")
-                                if i == 2:
-                                    model.handle_short_entry(
-                                        self.server.buffer_df["close"].iloc[-1],
-                                        self.server.buffer_df["datetime"].iloc[-1],
-                                    )
-                                    print(f"model: {model.get_name()} entered a short")
-                                if i == 3:
-                                    model.handle_short_exit(
-                                        self.server.buffer_df["close"].iloc[-1],
-                                        self.server.buffer_df["datetime"].iloc[-1],
-                                    )
-                                    print(f"model: {model.get_name()} exited a short")
-                            i += 1
+                                model.execute(
+                                    processed_data, self.server.buffer_df["datetime"].iloc[-1]
+                                )
                 except Exception as e:
                     print(f"An error occurred: {e}")
 
