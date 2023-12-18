@@ -2,7 +2,8 @@ from flask import Flask, jsonify, request, render_template
 import datetime
 import sys
 import pickle
-import os import json
+import os 
+import json
 import threading
 from src.preprocess import DataPreprocessor
 from src.strategies.wave_model.wave_model import WaveModel
