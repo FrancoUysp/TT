@@ -1,6 +1,6 @@
 {
   "strategy_params": {
     "SHORT_THRESHOLD": -83,
-    "LONG_THRESHOLD": 41,
+    "LONG_THRESHOLD": 41
   }
 }
