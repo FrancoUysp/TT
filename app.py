@@ -2,10 +2,11 @@ from flask import Flask, jsonify, request, render_template
 import datetime
 import sys
 import pickle
-import os 
+import os
 import json
 import threading
 from src.preprocess import DataPreprocessor
+from src.strategies.trend_follower.trend_follower import TrendFollower
 from src.strategies.wave_model.wave_model import WaveModel
 from src.utils import *
 import time
@@ -21,6 +22,7 @@ CORS(app)
 data_lock = Lock()
 
 # Assuming the Server class is in the src.server_connect module
+
 
 class MainServer:
     def __init__(self):
@@ -43,7 +45,7 @@ class MainServer:
 
     def update_data(self):
         last_minute = datetime.datetime.now().minute
-        i = 0 
+        i = 0
         while True:
             current_time = datetime.datetime.now()
             current_minute = current_time.minute
@@ -64,16 +66,28 @@ class MainServer:
                                 #     processed_data, self.server.buffer_df["datetime"].iloc[-1]
                                 # )
                                 if i == 0:
-                                    model.handle_long_entry(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
+                                    model.handle_long_entry(
+                                        self.server.buffer_df["close"].iloc[-1],
+                                        self.server.buffer_df["datetime"].iloc[-1],
+                                    )
                                     print(f"model: {model.get_name()} entered a long")
                                 if i == 1:
-                                    model.handle_long_exit(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
+                                    model.handle_long_exit(
+                                        self.server.buffer_df["close"].iloc[-1],
+                                        self.server.buffer_df["datetime"].iloc[-1],
+                                    )
                                     print(f"model: {model.get_name()} exited a long")
                                 if i == 2:
-                                    model.handle_short_entry(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
+                                    model.handle_short_entry(
+                                        self.server.buffer_df["close"].iloc[-1],
+                                        self.server.buffer_df["datetime"].iloc[-1],
+                                    )
                                     print(f"model: {model.get_name()} entered a short")
                                 if i == 3:
-                                    model.handle_short_exit(self.server.buffer_df["close"].iloc[-1], self.server.buffer_df["datetime"].iloc[-1])
+                                    model.handle_short_exit(
+                                        self.server.buffer_df["close"].iloc[-1],
+                                        self.server.buffer_df["datetime"].iloc[-1],
+                                    )
                                     print(f"model: {model.get_name()} exited a short")
                                 i += 1
                 except Exception as e:
@@ -82,7 +96,9 @@ class MainServer:
             time_to_sleep = 60.5 - datetime.datetime.now().second
             time.sleep(time_to_sleep)
 
+
 main_server = MainServer()
+
 
 @app.route("/get_data", methods=["GET"])
 def get_data():
@@ -146,21 +162,37 @@ def add_model():
         else:
             # Here, we assume the model files are pickled and stored in a directory named "models/wave_model/"
             try:
-                model_1_path = os.path.join("models", "wave_model", "m1.pickle.dat")
-                model_2_path = os.path.join("models", "wave_model", "m2.pickle.dat")
+                if model_name == "wave_model":
+                    model_1_path = os.path.join("models", "wave_model", "m1.pickle.dat")
+                    model_2_path = os.path.join("models", "wave_model", "m2.pickle.dat")
 
-                # Make sure to handle the case where the files might not exist.
-                if not os.path.exists(model_1_path) or not os.path.exists(model_2_path):
-                    return (
-                        jsonify({"success": False, "message": "Model files not found"}),
-                        400,
+                    # Make sure to handle the case where the files might not exist.
+                    if not os.path.exists(model_1_path) or not os.path.exists(
+                        model_2_path
+                    ):
+                        return (
+                            jsonify(
+                                {"success": False, "message": "Model files not found"}
+                            ),
+                            400,
+                        )
+
+                    with open(model_1_path, "rb") as f1, open(model_2_path, "rb") as f2:
+                        model_1 = pickle.load(f1)
+                        model_2 = pickle.load(f2)
+
+                    new_model = WaveModel(
+                        model_1, model_2, model_params, main_server.server
                     )
 
-                with open(model_1_path, "rb") as f1, open(model_2_path, "rb") as f2:
-                    model_1 = pickle.load(f1)
-                    model_2 = pickle.load(f2)
+                elif model_name == "trend_follower":
+                    new_model = TrendFollower(model_params, main_server.server)
 
-                new_model = WaveModel(model_1, model_2, model_params, main_server.server)
+                else:
+                    return (
+                        jsonify({"error": False, "message": "Model not found"}),
+                        404,
+                    )
 
                 main_server.models[model_name] = new_model
                 return jsonify({"success": True, "message": "Model added successfully"})
@@ -335,4 +367,4 @@ def index():
 
 
 if __name__ == "__main__":
-    app.run(host=HOST_IP, port=HOST_PORT )
+    app.run(host=HOST_IP, port=HOST_PORT)
