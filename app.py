@@ -112,6 +112,7 @@ def get_models():
     models_info = []
     for model_name in os.listdir(models_dir):
         model_path = os.path.join(models_dir, model_name)
+        print(model_path)
         if os.path.isdir(model_path):
             params_file_path = os.path.join(model_path, "parameters.json")
             try:
