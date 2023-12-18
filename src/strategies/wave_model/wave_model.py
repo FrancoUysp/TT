@@ -233,6 +233,7 @@ class WaveModel():
             quantity=self.units,
             buy=True,
             sell=False,
+            comment = self.get_type()
         )
         self.in_long_trade = True
         self.trade_price = current_price
@@ -251,6 +252,7 @@ class WaveModel():
             buy=False,
             sell=True,
             id_position=self.trade_id,
+            comment = self.get_type()
         )
         self.in_long_trade = False
         self.trade_history.append(
@@ -271,6 +273,7 @@ class WaveModel():
             quantity=self.units,
             buy=False,
             sell=True,
+            comment = self.get_type()
         )
         self.in_short_trade = True
         self.trade_price = current_price
@@ -289,6 +292,7 @@ class WaveModel():
             buy=True,
             sell=False,
             id_position=self.trade_id,
+            comment = self.get_type()
         )
         self.in_short_trade = False
         self.trade_history.append(

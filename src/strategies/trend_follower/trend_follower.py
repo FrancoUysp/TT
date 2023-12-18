@@ -192,6 +192,7 @@ class TrendFollower():
             quantity=self.units,
             buy=True,
             sell=False,
+            comment = self.get_type()
         )
         self.trade_type = 1
         self.trade_price = current_price
@@ -211,6 +212,7 @@ class TrendFollower():
             buy=False,
             sell=True,
             id_position=self.trade_id,
+            comment = self.get_type()
         )
         self.in_trade = False
         self.trade_history.append(
@@ -231,6 +233,7 @@ class TrendFollower():
             quantity=self.units,
             buy=False,
             sell=True,
+            comment = self.get_type()
         )
         self.trade_type = 0
         self.trade_price = current_price
@@ -250,6 +253,7 @@ class TrendFollower():
             buy=True,
             sell=False,
             id_position=self.trade_id,
+            comment = self.get_type()
         )
         self.in_trade = False
         self.trade_history.append(
