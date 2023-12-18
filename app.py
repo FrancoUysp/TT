@@ -89,7 +89,7 @@ class MainServer:
                                         self.server.buffer_df["datetime"].iloc[-1],
                                     )
                                     print(f"model: {model.get_name()} exited a short")
-                                i += 1
+                            i += 1
                 except Exception as e:
                     print(f"An error occurred: {e}")
 
