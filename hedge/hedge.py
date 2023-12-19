@@ -250,7 +250,7 @@ def find_units(proportion, symbol, buy):
         mt5.shutdown()
         return 0
 
-    units = capital / symbol_price
+    units = math.floor(capital / symbol_price)
 
     # Adjust the units according to the minimum volume step
     units = units - (units % symbol_info.volume_step)
