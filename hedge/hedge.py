@@ -219,7 +219,7 @@ def place_trade(id:int, quantity:float, symbol, buy=False, sell=False, pct_tp=0,
 
     close_connection()
 
-def find_units(proportion, symbol):
+def find_units(proportion, symbol, buy):
     if not mt5.initialize():
         print("Failed to initialize MT5")
         return 0
@@ -240,7 +240,9 @@ def find_units(proportion, symbol):
         mt5.shutdown()
         return 0
 
-    symbol_price = symbol_info.ask if symbol_info.mode == mt5.SYMBOL_MODE_ASK else symbol_info.bid
+    # You can choose between the bid or ask price depending on your needs
+    # For example, use the ask price for buy orders and the bid price for sell orders
+    symbol_price  = symbol_info.ask if buy else symbol_info.bid
 
     # Calculate the number of units that can be bought
     if symbol_price == 0:
