@@ -12,7 +12,7 @@ from datetime import timedelta
 SERVER = "Pepperstone-Demo"
 PASSWORD = "duCf7yzn:h"
 LOGIN = 61202587
-SYMBOLS = ["AUX", "NAS100"] 
+SYMBOLS = ["XAUUSD", "NAS100"] 
 EMAIL_LIST = ["peter@trollopegroup.co.za", "francouysp@gmail.com", "marcoleroux7@gmail.com"]  # Define your email list
 last_email_sent_date = None  # To keep track of the last email sent date
 
@@ -422,7 +422,7 @@ def init_models():
     for sym in SYMBOLS:
         proportion = 0.5  # Example proportion value
 
-        if sym == "AUX":
+        if sym == "XAUUSD":
             L_thresh_prop = 0.0015 
             S_thresh_prop = -0.002 
         else:
