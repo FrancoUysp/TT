@@ -13,7 +13,7 @@ SERVER = "Pepperstone-Demo"
 PASSWORD = "duCf7yzn:h"
 LOGIN = 61202587
 SYMBOLS = ["XAUUSD", "NAS100"] 
-EMAIL_LIST = ["francouysp@gmail.com"]  # Define your email list
+EMAIL_LIST = ["peter@trollopegroup.co.za", "francouysp@gmail.com", "marcoleroux7@gmail.com"]  # Define your email list
 last_email_sent_date = None  # To keep track of the last email sent date
 
 def send_email(subject, body, to_email):
@@ -148,7 +148,6 @@ def place_trade(id:int, quantity:float, symbol, buy=False, sell=False, pct_tp=0,
         close_connection()
         return
 
-    print(id_position)
     # enter a long
     if buy and id_position == None:
         trade_request = {
@@ -316,7 +315,8 @@ def get_trade_information(sym):
         return f"No trade history found for {sym}"
 
     # Filter trades by symbol and specific comment pattern
-    filtered_trades = [trade for trade in trades if trade.symbol == sym and sym in trade.comment]
+    com = sym + " tf"
+    filtered_trades = [trade for trade in trades if trade.symbol == sym and com in trade.comment]
     print(f"Filtered Trades: {len(filtered_trades)}")
 
     # Analyze the filtered trades
@@ -341,7 +341,7 @@ class TrendFollower():
         self.symbol = symbol
         
         self.trade_id = None
-        self.model_id = f"{symbol}"
+        self.model_id = f"{symbol} tf"
 
         self.latest_date = None
         self.current_price = 0
@@ -368,8 +368,13 @@ class TrendFollower():
             return
         price_change = self.current_price - self.prev_price
         
-        self.L_thresh = self.current_price * self.L_thresh_prop
-        self.S_thresh = self.current_price * self.S_thresh_prop
+        if (self.symbol == "XAUUSD"):
+            self.L_thresh = self.current_price * self.L_thresh_prop
+            self.S_thresh = self.current_price * self.S_thresh_prop
+        else:
+            self.L_thresh = self.L_thresh_prop
+            self.S_thresh = self.S_thresh_prop
+
         
         self.prev_price = self.current_price
         self.prev_neg = self.accumulative_sum_neg
@@ -385,30 +390,27 @@ class TrendFollower():
         self.sum_bull = self.prev_pos if (self.prev_pos > 0 and self.accumulative_sum_pos == 0) else 0
         self.sum_bear = self.prev_neg if (self.prev_neg < 0 and self.accumulative_sum_neg == 0) else 0
        
-        # if self.sum_bull > self.L_thresh:
-        if self.in_trade and self.trade_type == 0:  
-            place_trade(id=None, quantity=self.units, buy=True, id_position=self.trade_id, symbol=self.symbol, comment=self.model_id)
-            self.in_trade = False
-            self.trade_id = None
-        if not self.in_trade:  
-            self.units = find_units(self.proportion, self.symbol, buy = True)
-            self.trade_id = place_trade(id=None, quantity=self.units, buy=True, symbol=self.symbol, comment=self.model_id)
-            self.trade_type = 1
-            self.in_trade = True
-            return
+        if self.sum_bull > self.L_thresh:
+            if self.in_trade and self.trade_type == 0:  
+                place_trade(id=None, quantity=self.units, buy=True, id_position=self.trade_id, symbol=self.symbol, comment=self.model_id)
+                self.in_trade = False
+                self.trade_id = None
+            if not self.in_trade:  
+                self.units = find_units(self.proportion, self.symbol, buy = True)
+                self.trade_id = place_trade(id=None, quantity=self.units, buy=True, symbol=self.symbol, comment=self.model_id)
+                self.trade_type = 1
+                self.in_trade = True
 
-        # elif self.sum_bear < self.S_thresh:
-        if self.in_trade and self.trade_type == 1:  
-            place_trade(id=None, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=self.model_id)
-            self.in_trade = False
-            self.trade_id = None
-        if not self.in_trade:  
-            # Enter short trade use place trade to do this
-            self.units = find_units(self.proportion, self.symbol, buy = False)
-            self.trade_id = place_trade(id=None, quantity=self.units, sell=True, symbol=self.symbol, comment=self.model_id)
-            self.trade_type = 0
-            self.in_trade = True
-            return
+        elif self.sum_bear < self.S_thresh:
+            if self.in_trade and self.trade_type == 1:  
+                place_trade(id=None, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=self.model_id)
+                self.in_trade = False
+                self.trade_id = None
+            if not self.in_trade:  
+                self.units = find_units(self.proportion, self.symbol, buy = False)
+                self.trade_id = place_trade(id=None, quantity=self.units, sell=True, symbol=self.symbol, comment=self.model_id)
+                self.trade_type = 0
+                self.in_trade = True
 
 
 def send_daily_emails():
@@ -429,13 +431,12 @@ def init_models():
     models = {}
     for sym in SYMBOLS:
         proportion = 0.5  # Example proportion value
-
         if sym == "XAUUSD":
-            L_thresh_prop = 0.005 
-            S_thresh_prop = -0.002 
+            L_thresh_prop = 0.0015 
+            S_thresh_prop = -0.0002 
         else:
-            L_thresh_prop = 0.003     # Example threshold values
-            S_thresh_prop = -0.004
+            L_thresh_prop = 45    # Example threshold values
+            S_thresh_prop = -60
 
         models[sym] = TrendFollower(proportion, L_thresh_prop, S_thresh_prop, sym)
     
@@ -454,7 +455,7 @@ def main():
         current_minute = current_time.minute
         
         # Email sending check
-        if current_time.hour == 13 and current_time.minute == 4 and (last_email_sent_date != current_time.date()):
+        if current_time.hour == 15 and current_time.minute == 0 and (last_email_sent_date != current_time.date()):
             send_daily_emails()
             last_email_sent_date = current_time.date()
 
