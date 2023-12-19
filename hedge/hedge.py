@@ -133,9 +133,12 @@ def place_trade(id:int, quantity:float, symbol, buy=False, sell=False, pct_tp=0,
     # calculate the margin required to place the order
     if buy:
         cost_of_one_lot = symbol_info.trade_contract_size * symbol_info.ask
-        print(symbol_info.trade_contract_size, symbol_info.ask)
+        if symbol == "XAUUSD":
+            cost_of_one_lot /= 100
     if sell:
         cost_of_one_lot = symbol_info.trade_contract_size * symbol_info.bid
+        if symbol == "XAUUSD":
+            cost_of_one_lot /= 100
 
     if (
         cost_of_one_lot != None
