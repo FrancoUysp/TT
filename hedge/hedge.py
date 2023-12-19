@@ -454,7 +454,7 @@ def main():
         current_minute = current_time.minute
         
         # Email sending check
-        if current_time.hour == 15 and current_time.minute == 0 and (last_email_sent_date != current_time.date()):
+        if current_time.hour == 15 and current_time.minute == 3 and (last_email_sent_date != current_time.date()):
             send_daily_emails()
             last_email_sent_date = current_time.date()
 
