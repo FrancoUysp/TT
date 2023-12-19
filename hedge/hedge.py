@@ -383,12 +383,12 @@ class TrendFollower():
             place_trade(id=self.trade_id, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
             self.in_trade = False
             self.trade_id = None
+            print("###############################exit short")
         if not self.in_trade:  
             self.units = find_units(self.proportion, self.symbol, buy = True)
-            print("found")
             comment = f"{self.symbol}"
             self.trade_id = place_trade(id=None, quantity=self.units, buy=True, symbol=self.symbol, comment=comment)
-            print("placed")
+            print("###############################placed long")
             self.trade_type = 1
             self.in_trade = True
             return
@@ -398,12 +398,14 @@ class TrendFollower():
             comment = f"{self.symbol}"
             place_trade(id=self.trade_id, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
             self.in_trade = False
+            print("###############################exit long")
             self.trade_id = None
         if not self.in_trade:  
             # Enter short trade use place trade to do this
             comment = f"{self.symbol}"
             self.units = find_units(self.proportion, self.symbol, buy = False)
             self.trade_id = place_trade(id=None, quantity=self.units, sell=True, symbol=self.symbol, comment=comment)
+            print("###############################placed short")
             self.trade_type = 0
             self.in_trade = True
             return
