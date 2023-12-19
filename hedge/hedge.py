@@ -49,10 +49,10 @@ def connect():
     mt5.initialize()
     authorized = mt5.login(LOGIN, password=PASSWORD, server=SERVER)
 
-    if authorized:
+    if not authorized:
         print(f"Connected: Connecting to MT5 Client at {SERVER}")
-    else:
-        print("Failed to connect, error code: {}".format(mt5.last_error()))
+    # else:
+    #     print("Failed to connect, error code: {}".format(mt5.last_error()))
 
 def close_connection():
     """
@@ -308,6 +308,7 @@ def get_trade_information(sym):
     if trades is None or len(trades) == 0:
         mt5.shutdown()
         return f"No trade history found for {sym}"
+    print(trades)
 
     # Filter trades by symbol and specific comment pattern
     filtered_trades = [trade for trade in trades if trade.symbol == sym and 'unique identifier' in trade.comment]
@@ -335,6 +336,7 @@ class TrendFollower():
         self.symbol = symbol
         
         self.trade_id = None
+        self.model_id = f"{symbol}"
 
         self.latest_date = None
         self.current_price = 0
@@ -380,33 +382,25 @@ class TrendFollower():
        
         # if self.sum_bull > self.L_thresh:
         if self.in_trade and self.trade_type == 0:  
-            comment = f"{self.symbol}"
-            place_trade(id=None, quantity=self.units, buy=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
+            place_trade(id=None, quantity=self.units, buy=True, id_position=self.trade_id, symbol=self.symbol, comment=self.model_id)
             self.in_trade = False
             self.trade_id = None
-            # print("###############################exit short", self.trade_id)
         if not self.in_trade:  
             self.units = find_units(self.proportion, self.symbol, buy = True)
-            comment = f"{self.symbol}"
-            self.trade_id = place_trade(id=None, quantity=self.units, buy=True, symbol=self.symbol, comment=comment)
-            # print("###############################placed long", self.trade_id)
+            self.trade_id = place_trade(id=None, quantity=self.units, buy=True, symbol=self.symbol, comment=self.model_id)
             self.trade_type = 1
             self.in_trade = True
             return
 
         # elif self.sum_bear < self.S_thresh:
         if self.in_trade and self.trade_type == 1:  
-            comment = f"{self.symbol}"
-            place_trade(id=None, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
+            place_trade(id=None, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=self.model_id)
             self.in_trade = False
-            # print("###############################exit long", self.trade_id)
             self.trade_id = None
         if not self.in_trade:  
             # Enter short trade use place trade to do this
-            comment = f"{self.symbol}"
             self.units = find_units(self.proportion, self.symbol, buy = False)
-            self.trade_id = place_trade(id=None, quantity=self.units, sell=True, symbol=self.symbol, comment=comment)
-            # print("###############################placed short", self.trade_id)
+            self.trade_id = place_trade(id=None, quantity=self.units, sell=True, symbol=self.symbol, comment=self.model_id)
             self.trade_type = 0
             self.in_trade = True
             return
@@ -459,17 +453,15 @@ def main():
             send_daily_emails()
             last_email_sent_date = current_time.date()
 
+        print(get_trade_information("NAS100"))
 
         if last_minute != current_minute:
             last_minute = current_minute  
             print("Fetching new minute data...")
             for sym in SYMBOLS:
-                trade_info = get_trade_information(sym)
-                print(trade_info)
                 # Fetch the latest minute interval data for each symbol
                 latest_minute_data = get_latest_min(sym, server_time_offset_hours)
                 latest_data[sym] = latest_minute_data
-                print(f"Latest data for {sym}: {latest_data[sym]}")
 
                 # Execute the model for the symbol if data is available
                 if latest_minute_data is not None:
