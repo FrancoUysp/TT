@@ -12,7 +12,7 @@ from datetime import timedelta
 SERVER = "Pepperstone-Demo"
 PASSWORD = "duCf7yzn:h"
 LOGIN = 61202587
-SYMBOLS = ["XAUUSD", "NAS100"] 
+SYMBOLS = ["NAS100"] 
 EMAIL_LIST = ["peter@trollopegroup.co.za", "francouysp@gmail.com", "marcoleroux7@gmail.com"]  # Define your email list
 last_email_sent_date = None  # To keep track of the last email sent date
 
@@ -381,7 +381,6 @@ class TrendFollower():
         self.sum_bull = self.prev_pos if (self.prev_pos > 0 and self.accumulative_sum_pos == 0) else 0
         self.sum_bear = self.prev_neg if (self.prev_neg < 0 and self.accumulative_sum_neg == 0) else 0
        
-        print(self.trade_id)
         # if self.sum_bull > self.L_thresh:
         if self.in_trade and self.trade_type == 0:  
             comment = f"{self.symbol}"
