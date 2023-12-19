@@ -299,34 +299,30 @@ def get_trade_information(sym):
     if not mt5.initialize():
         return "Failed to initialize MT5"
 
-    # Define the time range for trade history (e.g., last month)
+    # Define the time range for trade history
     from_date = datetime.datetime.now() - datetime.timedelta(days=30)
     to_date = datetime.datetime.now()
 
     trades = mt5.history_deals_get(from_date, to_date)
-    if trades is None:
+    if trades is None or len(trades) == 0:
         mt5.shutdown()
         return f"No trade history found for {sym}"
 
-    # Filter trades by symbol and comment
-    filtered_trades = [trade for trade in trades if trade.symbol == sym and sym in trade.comment]
+    # Filter trades by symbol and specific comment pattern
+    filtered_trades = [trade for trade in trades if trade.symbol == sym and 'unique identifier' in trade.comment]
 
     # Analyze the filtered trades
     trade_info = []
     for trade in filtered_trades:
-        # Extract necessary information
         trade_time = datetime.datetime.fromtimestamp(trade.time)
         trade_type = "Buy" if trade.type == mt5.ORDER_TYPE_BUY else "Sell"
         profit = trade.profit
-        # Append information to the list
+        # Additional information can be added here
         trade_info.append(f"Time: {trade_time}, Type: {trade_type}, Profit: {profit}")
 
     mt5.shutdown()
 
-    # Calculate returns and other statistics based on trade_info
-
-    # Format and return the information
-    return "\n".join(trade_info)
+    return "\n".join(trade_info) if trade_info else f"No trades found for {sym} with specified criteria."
 
 class TrendFollower():
     def __init__(self, proportion, L_thresh_prop, S_thresh_prop, symbol):
@@ -336,6 +332,7 @@ class TrendFollower():
         self.units = 0
         self.proportion= proportion
         self.symbol = symbol
+        print("INITTTTTTTT")
         
         self.trade_id = None
 
