@@ -1,4 +1,5 @@
 import pandas as pd 
+import StringIO
 import numpy as np 
 import math
 import smtplib
@@ -13,7 +14,7 @@ SERVER = "Pepperstone-Demo"
 PASSWORD = "duCf7yzn:h"
 LOGIN = 61202587
 SYMBOLS = ["XAUUSD", "NAS100"] 
-EMAIL_LIST = ["peter@trollopegroup.co.za", "francouysp@gmail.com", "marcoleroux7@gmail.com"]  # Define your email list
+EMAIL_LIST = ["francouysp@gmail.com"]  # Define your email list
 last_email_sent_date = None  # To keep track of the last email sent date
 
 def send_email(subject, body, to_email):
@@ -454,11 +455,10 @@ def main():
         current_minute = current_time.minute
         
         # Email sending check
-        if current_time.hour == 18 and current_time.minute == 0 and (last_email_sent_date != current_time.date()):
+        if current_time.hour == 15 and current_time.minute == 0 and (last_email_sent_date != current_time.date()):
             send_daily_emails()
             last_email_sent_date = current_time.date()
 
-        print(get_trade_information("NAS100"))
 
         if last_minute != current_minute:
             last_minute = current_minute  
