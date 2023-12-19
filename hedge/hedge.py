@@ -298,6 +298,7 @@ def get_latest_min(symbol, server_time_offset_hours):
 
 def get_trade_information(sym):
     if not mt5.initialize():
+        print("Failed to initialize MT5")
         return "Failed to initialize MT5"
 
     # Define the time range for trade history
@@ -305,13 +306,18 @@ def get_trade_information(sym):
     to_date = datetime.datetime.now()
 
     trades = mt5.history_deals_get(from_date, to_date)
-    if trades is None or len(trades) == 0:
+    if trades is None:
+        print("No trades returned from history_deals_get")
         mt5.shutdown()
         return f"No trade history found for {sym}"
-    print(trades)
+    elif len(trades) == 0:
+        print("Zero trades found in the specified period")
+        mt5.shutdown()
+        return f"No trade history found for {sym}"
 
     # Filter trades by symbol and specific comment pattern
     filtered_trades = [trade for trade in trades if trade.symbol == sym and 'unique identifier' in trade.comment]
+    print(f"Filtered Trades: {len(filtered_trades)}")
 
     # Analyze the filtered trades
     trade_info = []
@@ -319,7 +325,6 @@ def get_trade_information(sym):
         trade_time = datetime.datetime.fromtimestamp(trade.time)
         trade_type = "Buy" if trade.type == mt5.ORDER_TYPE_BUY else "Sell"
         profit = trade.profit
-        # Additional information can be added here
         trade_info.append(f"Time: {trade_time}, Type: {trade_type}, Profit: {profit}")
 
     mt5.shutdown()
