@@ -302,8 +302,8 @@ def get_trade_information(sym):
         return "Failed to initialize MT5"
 
     # Define the time range for trade history
-    from_date = datetime.datetime.now() - datetime.timedelta(days=30)
-    to_date = datetime.datetime.now()
+    from_date = datetime.datetime.now() + datetime.timedelta(hours=2) - datetime.timedelta(days=30)
+    to_date = datetime.datetime.now()+ datetime.timedelta(hours=2)
 
     trades = mt5.history_deals_get(from_date, to_date)
     if trades is None:
