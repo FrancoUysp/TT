@@ -333,7 +333,6 @@ class TrendFollower():
         self.units = 0
         self.proportion= proportion
         self.symbol = symbol
-        print("INITTTTTTTT")
         
         self.trade_id = None
 
@@ -382,7 +381,7 @@ class TrendFollower():
         # if self.sum_bull > self.L_thresh:
         if self.in_trade and self.trade_type == 0:  
             comment = f"{self.symbol}"
-            place_trade(id=None, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
+            place_trade(id=None, quantity=self.units, buy=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
             self.in_trade = False
             self.trade_id = None
             print("###############################exit short", self.trade_id)
