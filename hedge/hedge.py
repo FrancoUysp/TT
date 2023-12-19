@@ -316,7 +316,7 @@ def get_trade_information(sym):
         return f"No trade history found for {sym}"
 
     # Filter trades by symbol and specific comment pattern
-    filtered_trades = [trade for trade in trades if trade.symbol == sym and 'unique identifier' in trade.comment]
+    filtered_trades = [trade for trade in trades if trade.symbol == sym and sym in trade.comment]
     print(f"Filtered Trades: {len(filtered_trades)}")
 
     # Analyze the filtered trades
