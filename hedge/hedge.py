@@ -433,16 +433,15 @@ def init_models():
     
     return models
 
-last_minute = datetime.datetime.now().minute
-latest_data = {}
-server_time_offset_hours = 2  # Adjust this based on your server's time difference
-models = {}
-
-
 def main():
+
+    latest_data = {}
+    server_time_offset_hours = 2  # Adjust this based on your server's time difference
+    models = {}
     global last_email_sent_date
     init_models()
     last_minute = datetime.datetime.now().minute
+
     while True:
         current_time = datetime.datetime.now()
         current_minute = current_time.minute
