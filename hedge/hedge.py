@@ -148,6 +148,7 @@ def place_trade(id:int, quantity:float, symbol, buy=False, sell=False, pct_tp=0,
         close_connection()
         return
 
+    print(id_position)
     # enter a long
     if buy and id_position == None:
         trade_request = {
