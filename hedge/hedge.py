@@ -1,5 +1,4 @@
 import pandas as pd 
-import StringIO
 import numpy as np 
 import math
 import smtplib
