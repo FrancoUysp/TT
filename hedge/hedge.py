@@ -140,6 +140,7 @@ def place_trade(id:int, quantity:float, symbol, buy=False, sell=False, pct_tp=0,
         cost_of_one_lot != None
         and account_info.margin_free < cost_of_one_lot * quantity
     ):
+        print(account_info.margin_free, cost_of_one_lot, quantity)
         print("Insufficient margin to place order")
         close_connection()
         return
