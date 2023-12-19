@@ -375,32 +375,34 @@ class TrendFollower():
         self.sum_bull = self.prev_pos if (self.prev_pos > 0 and self.accumulative_sum_pos == 0) else 0
         self.sum_bear = self.prev_neg if (self.prev_neg < 0 and self.accumulative_sum_neg == 0) else 0
        
-        if self.sum_bull > self.L_thresh:
-            if self.in_trade and self.trade_type == 0:  
-                comment = f"{self.symbol}"
-                place_trade(id=self.trade_id, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
-                self.in_trade = False
-                self.trade_id = None
-            if not self.in_trade:  
-                self.units = find_units(self.proportion, self.symbol)
-                comment = f"{self.symbol}"
-                self.trade_id = place_trade(id=None, quantity=self.units, buy=True, symbol=self.symbol, comment=comment)
-                self.trade_type = 1
-                self.in_trade = True
+        # if self.sum_bull > self.L_thresh:
+        if self.in_trade and self.trade_type == 0:  
+            comment = f"{self.symbol}"
+            place_trade(id=self.trade_id, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
+            self.in_trade = False
+            self.trade_id = None
+        if not self.in_trade:  
+            self.units = find_units(self.proportion, self.symbol)
+            comment = f"{self.symbol}"
+            self.trade_id = place_trade(id=None, quantity=self.units, buy=True, symbol=self.symbol, comment=comment)
+            self.trade_type = 1
+            self.in_trade = True
+            return
 
-        elif self.sum_bear < self.S_thresh:
-            if self.in_trade and self.trade_type == 1:  
-                comment = f"{self.symbol}"
-                place_trade(id=self.trade_id, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
-                self.in_trade = False
-                self.trade_id = None
-            if not self.in_trade:  
-                # Enter short trade use place trade to do this
-                comment = f"{self.symbol}"
-                self.units = find_units(self.proportion, self.symbol)
-                self.trade_id = place_trade(id=None, quantity=self.units, sell=True, symbol=self.symbol, comment=comment)
-                self.trade_type = 0
-                self.in_trade = True
+        # elif self.sum_bear < self.S_thresh:
+        if self.in_trade and self.trade_type == 1:  
+            comment = f"{self.symbol}"
+            place_trade(id=self.trade_id, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
+            self.in_trade = False
+            self.trade_id = None
+        if not self.in_trade:  
+            # Enter short trade use place trade to do this
+            comment = f"{self.symbol}"
+            self.units = find_units(self.proportion, self.symbol)
+            self.trade_id = place_trade(id=None, quantity=self.units, sell=True, symbol=self.symbol, comment=comment)
+            self.trade_type = 0
+            self.in_trade = True
+            return
 
 
 def send_daily_emails():
@@ -423,11 +425,11 @@ def init_models():
         proportion = 0.5  # Example proportion value
 
         if sym == "XAUUSD":
-            L_thresh_prop = 0.00001
-            S_thresh_prop = -0.00001 
+            L_thresh_prop = 0.005 
+            S_thresh_prop = -0.002 
         else:
-            L_thresh_prop = 0.00003     # Example threshold values
-            S_thresh_prop = -0.00004
+            L_thresh_prop = 0.003     # Example threshold values
+            S_thresh_prop = -0.004
 
         models[sym] = TrendFollower(proportion, L_thresh_prop, S_thresh_prop, sym)
     
