@@ -12,7 +12,7 @@ from datetime import timedelta
 SERVER = "Pepperstone-Demo"
 PASSWORD = "duCf7yzn:h"
 LOGIN = 61202587
-SYMBOLS = ["NAS100"] 
+SYMBOLS = ["XAUUSD", "NAS100"] 
 EMAIL_LIST = ["peter@trollopegroup.co.za", "francouysp@gmail.com", "marcoleroux7@gmail.com"]  # Define your email list
 last_email_sent_date = None  # To keep track of the last email sent date
 
@@ -384,12 +384,12 @@ class TrendFollower():
             place_trade(id=None, quantity=self.units, buy=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
             self.in_trade = False
             self.trade_id = None
-            print("###############################exit short", self.trade_id)
+            # print("###############################exit short", self.trade_id)
         if not self.in_trade:  
             self.units = find_units(self.proportion, self.symbol, buy = True)
             comment = f"{self.symbol}"
             self.trade_id = place_trade(id=None, quantity=self.units, buy=True, symbol=self.symbol, comment=comment)
-            print("###############################placed long", self.trade_id)
+            # print("###############################placed long", self.trade_id)
             self.trade_type = 1
             self.in_trade = True
             return
@@ -399,14 +399,14 @@ class TrendFollower():
             comment = f"{self.symbol}"
             place_trade(id=None, quantity=self.units, sell=True, id_position=self.trade_id, symbol=self.symbol, comment=comment)
             self.in_trade = False
-            print("###############################exit long", self.trade_id)
+            # print("###############################exit long", self.trade_id)
             self.trade_id = None
         if not self.in_trade:  
             # Enter short trade use place trade to do this
             comment = f"{self.symbol}"
             self.units = find_units(self.proportion, self.symbol, buy = False)
             self.trade_id = place_trade(id=None, quantity=self.units, sell=True, symbol=self.symbol, comment=comment)
-            print("###############################placed short", self.trade_id)
+            # print("###############################placed short", self.trade_id)
             self.trade_type = 0
             self.in_trade = True
             return
@@ -464,6 +464,8 @@ def main():
             last_minute = current_minute  
             print("Fetching new minute data...")
             for sym in SYMBOLS:
+                trade_info = get_trade_information(sym)
+                print(trade_info)
                 # Fetch the latest minute interval data for each symbol
                 latest_minute_data = get_latest_min(sym, server_time_offset_hours)
                 latest_data[sym] = latest_minute_data
