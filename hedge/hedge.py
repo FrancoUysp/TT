@@ -261,11 +261,20 @@ def get_latest_min(symbol, server_time_offset_hours):
         print("Failed to initialize MT5")
         return None
 
+    # Ensure the symbol is watched
+    if not mt5.symbol_select(symbol, True):
+        print(f"Failed to watch symbol {symbol}")
+        mt5.shutdown()
+        return None
+
     # Adjust for server time difference
     server_time = datetime.datetime.now() + timedelta(hours=server_time_offset_hours)
     server_time = server_time.replace(microsecond=0, second=0) - timedelta(minutes=1)
 
     rates = mt5.copy_rates_from(symbol, mt5.TIMEFRAME_M1, int(server_time.timestamp()), 1)
+
+    # You can stop watching the symbol if you don't need it after fetching data
+    # mt5.symbol_select(symbol, False)
 
     mt5.shutdown()
 
