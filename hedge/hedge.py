@@ -423,11 +423,11 @@ def init_models():
         proportion = 0.5  # Example proportion value
 
         if sym == "XAUUSD":
-            L_thresh_prop = 0.0015 
-            S_thresh_prop = -0.002 
+            L_thresh_prop = 0.00001
+            S_thresh_prop = -0.00001 
         else:
-            L_thresh_prop = 0.003     # Example threshold values
-            S_thresh_prop = -0.004
+            L_thresh_prop = 0.00003     # Example threshold values
+            S_thresh_prop = -0.00004
 
         models[sym] = TrendFollower(proportion, L_thresh_prop, S_thresh_prop, sym)
     
