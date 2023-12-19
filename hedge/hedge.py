@@ -9,7 +9,6 @@ import datetime
 import time
 from datetime import timedelta
 
-data = read_df(DATA_PATH) # simulated live market datagmail_password = 'fany feqy qhlx eaoc'
 SERVER = "Pepperstone-Demo"
 PASSWORD = "duCf7yzn:h"
 LOGIN = 61202587
