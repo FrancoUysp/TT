@@ -318,7 +318,7 @@ def get_trade_information(sym):
         return f"No trade history found for {sym}"
 
     # Filter trades by symbol and specific comment pattern
-    com = sym + " tf"
+    com = sym + " v2"
     filtered_trades = [trade for trade in trades if trade.symbol == sym and com in trade.comment]
     print(f"Filtered Trades: {len(filtered_trades)}")
 
@@ -344,7 +344,7 @@ class TrendFollower():
         self.symbol = symbol
         
         self.trade_id = None
-        self.model_id = f"{symbol} tf"
+        self.model_id = f"{symbol} v2"
 
         self.latest_date = None
         self.current_price = 0
