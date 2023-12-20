@@ -148,6 +148,9 @@ def place_trade(id:int, quantity:float, symbol, buy=False, sell=False, pct_tp=0,
         close_connection()
         return
 
+    if symbol == "XAUUSD":
+        quantity = quantity / 100
+
     # enter a long
     if buy and id_position == None:
         trade_request = {
@@ -433,7 +436,7 @@ def init_models():
         proportion = 0.5  # Example proportion value
         if sym == "XAUUSD":
             L_thresh_prop = 0.0015 
-            S_thresh_prop = -0.0002 
+            S_thresh_prop = -0.002 
         else:
             L_thresh_prop = 45    # Example threshold values
             S_thresh_prop = -60
