@@ -465,7 +465,7 @@ def main():
 
         if last_minute != current_minute:
             last_minute = current_minute  
-            print("Fetching new minute data...")
+            print(f"Fetching new minute data... {datetime.datetime.now() + datetime.timedelta(hours=2)}")
             for sym in SYMBOLS:
                 # Fetch the latest minute interval data for each symbol
                 latest_minute_data = get_latest_min(sym, server_time_offset_hours)
