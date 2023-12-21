@@ -150,6 +150,7 @@ def place_trade(id:int, quantity:float, symbol, buy=False, sell=False, pct_tp=0,
 
     if symbol == "XAUUSD":
         quantity = quantity / 100
+    print(quantity)
 
     # enter a long
     if buy and id_position == None:
