@@ -377,6 +377,7 @@ class TrendFollower():
         else:
             self.L_thresh = self.L_thresh_prop
             self.S_thresh = self.S_thresh_prop
+        print(f"thresholds are {self.S_thresh } and {self.L_thresh } for {self.symbol}")
 
         
         self.prev_price = self.current_price
